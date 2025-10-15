@@ -37,7 +37,7 @@ class JavaScriptNode(BaseNode):
     is_callback: bool = False
     is_prototype_method: bool = False
     captures_closure: bool = False
-    captured_variables: list[str] = field(default_factory=list)
+    captured_variables: list[str] = field(default_factory=lambda: list[str]())
     is_constructor: bool = False
     is_generator: bool = False
 

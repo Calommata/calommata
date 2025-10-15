@@ -37,7 +37,7 @@ class BaseNode(ABC):
     language: LanguageType = "python"  # Language this node belongs to
 
     # Language-specific metadata
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for graph storage."""
@@ -71,7 +71,7 @@ class BaseRelation(ABC):
     from_id: str
     to_id: str
     relation_type: RelationType
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for graph storage."""

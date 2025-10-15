@@ -37,7 +37,7 @@ class TypeScriptNode(BaseNode):
     has_type_annotation: bool = False
     type_annotation: str | None = None
     is_generic: bool = False
-    generic_parameters: list[str] = field(default_factory=list)
+    generic_parameters: list[str] = field(default_factory=lambda: list[str]())
     is_interface_member: bool = False
     is_enum: bool = False
     is_namespace: bool = False

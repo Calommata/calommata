@@ -32,7 +32,7 @@ class PythonNode(BaseNode):
     is_async: bool = False
     is_generator: bool = False
     has_decorators: bool = False
-    decorators: list[str] = field(default_factory=list)
+    decorators: list[str] = field(default_factory=lambda: list[str]())
     is_lambda: bool = False
     is_comprehension: bool = False
     comprehension_type: str | None = None  # list, dict, set, generator

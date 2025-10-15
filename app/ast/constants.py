@@ -5,10 +5,14 @@ with lazy loading to avoid import performance issues.
 """
 
 from functools import lru_cache
+from typing import cast
+
+LanguageConstants = dict[str, set[str] | dict[str, str]]
+CombinedConstants = dict[str, set[str] | dict[str, str]]
 
 
 @lru_cache(maxsize=1)
-def _get_python_constants():
+def _get_python_constants() -> LanguageConstants:
     """Lazy load Python constants."""
     from app.ast.languages.python.python_constants import (
         PYTHON_CALL_TYPES,
@@ -32,7 +36,7 @@ def _get_python_constants():
 
 
 @lru_cache(maxsize=1)
-def _get_typescript_constants():
+def _get_typescript_constants() -> LanguageConstants:
     """Lazy load TypeScript constants."""
     from app.ast.languages.typescript.typescript_constants import (
         TYPESCRIPT_CALL_TYPES,
@@ -56,7 +60,7 @@ def _get_typescript_constants():
 
 
 @lru_cache(maxsize=1)
-def _get_javascript_constants():
+def _get_javascript_constants() -> LanguageConstants:
     """Lazy load JavaScript constants."""
     from app.ast.languages.javascript.javascript_constants import (
         JAVASCRIPT_CALL_TYPES,
@@ -80,58 +84,38 @@ def _get_javascript_constants():
 
 
 @lru_cache(maxsize=1)
-def get_combined_constants() -> dict[str, set[str] | dict[str, str]]:
+def get_combined_constants() -> CombinedConstants:
     """Get combined constants from all languages."""
     python = _get_python_constants()
     typescript = _get_typescript_constants()
     javascript = _get_javascript_constants()
 
+    # Type cast to ensure proper types for union operations
     return {
-        "definition_types": python["definition_types"]
-        | typescript["definition_types"]
-        | javascript["definition_types"],
-        "call_types": python["call_types"]
-        | typescript["call_types"]
-        | javascript["call_types"],
-        "import_types": python["import_types"]
-        | typescript["import_types"]
-        | javascript["import_types"],
+        "definition_types": cast(set[str], python["definition_types"])
+        | cast(set[str], typescript["definition_types"])
+        | cast(set[str], javascript["definition_types"]),
+        "call_types": cast(set[str], python["call_types"])
+        | cast(set[str], typescript["call_types"])
+        | cast(set[str], javascript["call_types"]),
+        "import_types": cast(set[str], python["import_types"])
+        | cast(set[str], typescript["import_types"])
+        | cast(set[str], javascript["import_types"]),
         "node_type_mapping": {
-            **python["node_type_mapping"],
-            **typescript["node_type_mapping"],
-            **javascript["node_type_mapping"],
+            **cast(dict[str, str], python["node_type_mapping"]),
+            **cast(dict[str, str], typescript["node_type_mapping"]),
+            **cast(dict[str, str], javascript["node_type_mapping"]),
         },
-        "parent_definition_types": python["parent_definition_types"]
-        | typescript["parent_definition_types"]
-        | javascript["parent_definition_types"],
-        "identifier_types": python["identifier_types"]
-        | typescript["identifier_types"]
-        | javascript["identifier_types"],
-        "complex_name_types": python["complex_name_types"]
-        | typescript["complex_name_types"]
-        | javascript["complex_name_types"],
+        "parent_definition_types": cast(set[str], python["parent_definition_types"])
+        | cast(set[str], typescript["parent_definition_types"])
+        | cast(set[str], javascript["parent_definition_types"]),
+        "identifier_types": cast(set[str], python["identifier_types"])
+        | cast(set[str], typescript["identifier_types"])
+        | cast(set[str], javascript["identifier_types"]),
+        "complex_name_types": cast(set[str], python["complex_name_types"])
+        | cast(set[str], typescript["complex_name_types"])
+        | cast(set[str], javascript["complex_name_types"]),
     }
-
-
-# Legacy constants for backward compatibility (lazy loaded)
-def get_definition_types():
-    """Get combined definition types from all languages."""
-    return get_combined_constants()["definition_types"]
-
-
-def get_call_types():
-    """Get combined call types from all languages."""
-    return get_combined_constants()["call_types"]
-
-
-def get_import_types():
-    """Get combined import types from all languages."""
-    return get_combined_constants()["import_types"]
-
-
-def get_node_type_mapping():
-    """Get combined node type mapping from all languages."""
-    return get_combined_constants()["node_type_mapping"]
 
 
 def get_parent_definition_types():
@@ -150,10 +134,6 @@ def get_complex_name_types():
 
 
 # Backward compatibility - lazy initialization
-DEFINITION_TYPES = get_definition_types()
-CALL_TYPES = get_call_types()
-IMPORT_TYPES = get_import_types()
-NODE_TYPE_MAPPING = get_node_type_mapping()
 PARENT_DEFINITION_TYPES = get_parent_definition_types()
 IDENTIFIER_TYPES = get_identifier_types()
 COMPLEX_NAME_TYPES = get_complex_name_types()
