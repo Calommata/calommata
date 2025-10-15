@@ -1,9 +1,9 @@
 """Python-specific AST models and node types."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
-from app.ast.base_models import (
+from app.ast.base.base_models import (
     BaseNode,
     BaseRelation,
     LanguageType,
@@ -32,14 +32,14 @@ class PythonNode(BaseNode):
     is_async: bool = False
     is_generator: bool = False
     has_decorators: bool = False
-    decorators: List[str] = field(default_factory=list)
+    decorators: list[str] = field(default_factory=list)
     is_lambda: bool = False
     is_comprehension: bool = False
-    comprehension_type: Optional[str] = None  # list, dict, set, generator
+    comprehension_type: str | None = None  # list, dict, set, generator
 
-    def get_language_features(self) -> Dict[str, Any]:
+    def get_language_features(self) -> dict[str, Any]:
         """Get Python-specific features."""
-        features = {
+        features: dict[str, Any] = {
             "is_async": self.is_async,
             "is_generator": self.is_generator,
             "has_decorators": self.has_decorators,
@@ -51,7 +51,7 @@ class PythonNode(BaseNode):
         features.update(self.metadata)
         return features
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary including Python-specific features."""
         base_dict = super().to_dict()
         base_dict.update(self.get_language_features())
@@ -66,7 +66,7 @@ class PythonRelation(BaseRelation):
     is_async_call: bool = False
     is_yield: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary including Python-specific features."""
         base_dict = super().to_dict()
         base_dict["metadata"].update(
@@ -89,8 +89,8 @@ def create_python_function_node(
     end_line: int,
     source_code: str,
     is_async: bool = False,
-    decorators: Optional[List[str]] = None,
-    parent_id: Optional[str] = None,
+    decorators: list[str] | None = None,
+    parent_id: str | None = None,
 ) -> PythonNode:
     """Create a Python function node with Python-specific features."""
     return PythonNode(
@@ -119,8 +119,8 @@ def create_python_class_node(
     start_line: int,
     end_line: int,
     source_code: str,
-    decorators: Optional[List[str]] = None,
-    parent_id: Optional[str] = None,
+    decorators: list[str] | None = None,
+    parent_id: str | None = None,
 ) -> PythonNode:
     """Create a Python class node with Python-specific features."""
     return PythonNode(

@@ -1,20 +1,20 @@
 """Parser factory for language-specific AST parsers."""
 
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Tuple
 
-from app.ast.base_models import BaseNode, BaseRelation, LanguageType
-from app.ast.base_parser import BaseASTParser
-from app.ast.languages.parsers.javascript_parser import JavaScriptParser
-from app.ast.languages.parsers.python_parser import PythonParser
-from app.ast.languages.parsers.typescript_parser import TypeScriptParser
+from app.ast.base.base_models import BaseNode, BaseRelation, LanguageType
+from app.ast.base.base_parser import BaseASTParser
+from app.ast.languages.javascript.javascript_parser import JavaScriptParser
+from app.ast.languages.python.python_parser import PythonParser
+from app.ast.languages.typescript.typescript_parser import TypeScriptParser
 
 
 class ParserFactory:
     """Factory class for creating language-specific parsers."""
 
     # Mapping of file extensions to language types
-    EXTENSION_TO_LANGUAGE: Dict[str, LanguageType] = {
+    EXTENSION_TO_LANGUAGE: dict[str, LanguageType] = {
         # Python
         ".py": "python",
         ".pyi": "python",
@@ -31,7 +31,7 @@ class ParserFactory:
     }
 
     # Parser instances (singleton pattern)
-    _parsers: Dict[LanguageType, BaseASTParser] = {}
+    _parsers: dict[LanguageType, BaseASTParser] = {}
 
     @classmethod
     def get_parser(cls, language: LanguageType) -> BaseASTParser:
@@ -101,7 +101,7 @@ class ParserFactory:
         return cls.EXTENSION_TO_LANGUAGE[extension]
 
     @classmethod
-    def get_supported_extensions(cls) -> List[str]:
+    def get_supported_extensions(cls) -> list[str]:
         """Get all supported file extensions.
 
         Returns:
@@ -110,7 +110,7 @@ class ParserFactory:
         return list(cls.EXTENSION_TO_LANGUAGE.keys())
 
     @classmethod
-    def get_supported_languages(cls) -> List[LanguageType]:
+    def get_supported_languages(cls) -> list[LanguageType]:
         """Get all supported programming languages.
 
         Returns:
@@ -119,7 +119,7 @@ class ParserFactory:
         return ["python", "javascript", "typescript"]
 
     @classmethod
-    def parse_file(cls, file_path: str) -> Tuple[List[BaseNode], List[BaseRelation]]:
+    def parse_file(cls, file_path: str) -> Tuple[list[BaseNode], list[BaseRelation]]:
         """Parse a source file using the appropriate language-specific parser.
 
         Args:
@@ -134,7 +134,7 @@ class ParserFactory:
     @classmethod
     def parse_source(
         cls, source_code: str, file_path: str, language: LanguageType | None = None
-    ) -> Tuple[List[BaseNode], List[BaseRelation]]:
+    ) -> Tuple[list[BaseNode], list[BaseRelation]]:
         """Parse source code using language-specific parser.
 
         Args:
@@ -155,7 +155,7 @@ class ParserFactory:
 # Convenience function for backward compatibility
 def parse_file(
     file_path: str, language: LanguageType | None = None
-) -> Tuple[List[BaseNode], List[BaseRelation]]:
+) -> Tuple[list[BaseNode], list[BaseRelation]]:
     """Parse a source file and extract graph structure.
 
     This is the main entry point for parsing files with language-specific features.

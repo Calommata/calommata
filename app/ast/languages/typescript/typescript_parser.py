@@ -1,13 +1,13 @@
 """TypeScript-specific AST parser with TypeScript language features."""
 
-from typing import List, Tuple
+from typing import Tuple
 
 import tree_sitter_typescript as ts_typescript
 from tree_sitter import Language, Node, Parser
 
-from app.ast.base_models import BaseNode, BaseRelation, NodeType
-from app.ast.base_parser import BaseASTParser
-from app.ast.languages.typescript_models import (
+from app.ast.base.base_models import BaseNode, BaseRelation, NodeType
+from app.ast.base.base_parser import BaseASTParser
+from app.ast.languages.typescript.typescript_models import (
     TypeScriptNode,
     TypeScriptRelation,
     create_typescript_class_node,
@@ -45,18 +45,18 @@ class TypeScriptParser(BaseASTParser):
         self.parser = Parser(Language(ts_typescript.language_typescript()))
         self.extractor = NodeExtractor()
 
-    def get_supported_extensions(self) -> List[str]:
+    def get_supported_extensions(self) -> list[str]:
         """Get supported TypeScript file extensions."""
         return [".ts", ".tsx", ".d.ts"]
 
     def parse(
         self, source_code: str, file_path: str
-    ) -> Tuple[List[BaseNode], List[BaseRelation]]:
+    ) -> Tuple[list[BaseNode], list[BaseRelation]]:
         """Parse TypeScript source code with TypeScript-specific features."""
         tree = self.parser.parse(source_code.encode("utf-8"))
 
-        nodes: List[BaseNode] = []
-        relations: List[BaseRelation] = []
+        nodes: list[BaseNode] = []
+        relations: list[BaseRelation] = []
         definitions: dict[str, str] = {}  # name -> node_id
 
         def traverse(node: Node) -> None:
@@ -99,8 +99,8 @@ class TypeScriptParser(BaseASTParser):
 
         # Extract TypeScript-specific features
         type_annotation = self._extract_type_annotation(node, source_code)
-        generic_parameters = self._extract_generic_parameters(node, source_code)
-        access_modifier = self._extract_access_modifier(node, source_code)
+        generic_parameters = self._extract_generic_parameters(node)
+        access_modifier = self._extract_access_modifier(node)
 
         if node.type in [
             "function_declaration",
@@ -229,11 +229,9 @@ class TypeScriptParser(BaseASTParser):
                 return source_code[child.start_byte : child.end_byte].strip()
         return None
 
-    def _extract_generic_parameters(
-        self, node: Node, source_code: str
-    ) -> List[str] | None:
+    def _extract_generic_parameters(self, node: Node) -> list[str] | None:
         """Extract generic type parameters from a node."""
-        generics = []
+        generics: list[str] = []
         for child in node.children:
             if child.type == "type_parameters":
                 # Extract individual type parameter names
@@ -244,7 +242,7 @@ class TypeScriptParser(BaseASTParser):
                             generics.append(param_name)
         return generics if generics else None
 
-    def _extract_access_modifier(self, node: Node, source_code: str) -> str | None:
+    def _extract_access_modifier(self, node: Node) -> str | None:
         """Extract access modifier (public, private, protected) from a node."""
         for child in node.children:
             if child.type in ["public", "private", "protected"]:

@@ -1,9 +1,9 @@
 """JavaScript-specific AST models and node types."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
-from app.ast.base_models import (
+from app.ast.base.base_models import (
     BaseNode,
     BaseRelation,
     LanguageType,
@@ -37,13 +37,13 @@ class JavaScriptNode(BaseNode):
     is_callback: bool = False
     is_prototype_method: bool = False
     captures_closure: bool = False
-    captured_variables: List[str] = field(default_factory=list)
+    captured_variables: list[str] = field(default_factory=list)
     is_constructor: bool = False
     is_generator: bool = False
 
-    def get_language_features(self) -> Dict[str, Any]:
+    def get_language_features(self) -> dict[str, Any]:
         """Get JavaScript-specific features."""
-        features = {
+        features: dict[str, Any] = {
             "is_arrow_function": self.is_arrow_function,
             "is_anonymous": self.is_anonymous,
             "is_iife": self.is_iife,
@@ -57,7 +57,7 @@ class JavaScriptNode(BaseNode):
         features.update(self.metadata)
         return features
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary including JavaScript-specific features."""
         base_dict = super().to_dict()
         base_dict.update(self.get_language_features())
@@ -73,7 +73,7 @@ class JavaScriptRelation(BaseRelation):
     is_prototype_access: bool = False
     closure_depth: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary including JavaScript-specific features."""
         base_dict = super().to_dict()
         base_dict["metadata"].update(
@@ -100,8 +100,8 @@ def create_javascript_function_node(
     is_anonymous: bool = False,
     is_generator: bool = False,
     captures_closure: bool = False,
-    captured_variables: Optional[List[str]] = None,
-    parent_id: Optional[str] = None,
+    captured_variables: list[str] | None = None,
+    parent_id: str | None = None,
 ) -> JavaScriptNode:
     """Create a JavaScript function node with JavaScript-specific features."""
     return JavaScriptNode(
@@ -133,7 +133,7 @@ def create_javascript_class_node(
     end_line: int,
     source_code: str,
     is_constructor: bool = False,
-    parent_id: Optional[str] = None,
+    parent_id: str | None = None,
 ) -> JavaScriptNode:
     """Create a JavaScript class node with JavaScript-specific features."""
     return JavaScriptNode(

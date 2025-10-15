@@ -1,9 +1,7 @@
 """JavaScript-specific AST constants and mappings."""
 
-from typing import Set
-
 # JavaScript-specific node types for definitions
-JAVASCRIPT_DEFINITION_TYPES: Set[str] = {
+JAVASCRIPT_DEFINITION_TYPES: set[str] = {
     "function_declaration",
     "class_declaration",
     "method_definition",
@@ -12,12 +10,12 @@ JAVASCRIPT_DEFINITION_TYPES: Set[str] = {
 }
 
 # JavaScript-specific call types
-JAVASCRIPT_CALL_TYPES: Set[str] = {
+JAVASCRIPT_CALL_TYPES: set[str] = {
     "call_expression",
 }
 
 # JavaScript-specific import types
-JAVASCRIPT_IMPORT_TYPES: Set[str] = {
+JAVASCRIPT_IMPORT_TYPES: set[str] = {
     "import_statement",
 }
 
@@ -31,7 +29,7 @@ JAVASCRIPT_NODE_TYPE_MAPPING: dict[str, str] = {
 }
 
 # JavaScript-specific parent definition types
-JAVASCRIPT_PARENT_DEFINITION_TYPES: Set[str] = {
+JAVASCRIPT_PARENT_DEFINITION_TYPES: set[str] = {
     "function_declaration",
     "class_declaration",
     "method_definition",
@@ -40,18 +38,18 @@ JAVASCRIPT_PARENT_DEFINITION_TYPES: Set[str] = {
 }
 
 # JavaScript-specific identifier types
-JAVASCRIPT_IDENTIFIER_TYPES: Set[str] = {
+JAVASCRIPT_IDENTIFIER_TYPES: set[str] = {
     "identifier",
     "property_identifier",
 }
 
 # JavaScript-specific complex name types
-JAVASCRIPT_COMPLEX_NAME_TYPES: Set[str] = {
+JAVASCRIPT_COMPLEX_NAME_TYPES: set[str] = {
     "member_expression",
 }
 
 # JavaScript callback function patterns
-JAVASCRIPT_CALLBACK_PATTERNS: Set[str] = {
+JAVASCRIPT_CALLBACK_PATTERNS: set[str] = {
     "map",
     "filter",
     "forEach",
@@ -65,14 +63,14 @@ JAVASCRIPT_CALLBACK_PATTERNS: Set[str] = {
 }
 
 # JavaScript generator keywords
-JAVASCRIPT_GENERATOR_KEYWORDS: Set[str] = {
+JAVASCRIPT_GENERATOR_KEYWORDS: set[str] = {
     "function*",
     "yield",
     "yield*",
 }
 
 # JavaScript closure detection patterns
-JAVASCRIPT_CLOSURE_PATTERNS: Set[str] = {
+JAVASCRIPT_CLOSURE_PATTERNS: set[str] = {
     "return function",
     "function(",
     "() =>",

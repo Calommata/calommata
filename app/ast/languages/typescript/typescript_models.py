@@ -1,9 +1,9 @@
 """TypeScript-specific AST models and node types."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
-from app.ast.base_models import (
+from app.ast.base.base_models import (
     BaseNode,
     BaseRelation,
     LanguageType,
@@ -35,20 +35,20 @@ class TypeScriptNode(BaseNode):
 
     # TypeScript-specific attributes
     has_type_annotation: bool = False
-    type_annotation: Optional[str] = None
+    type_annotation: str | None = None
     is_generic: bool = False
-    generic_parameters: List[str] = field(default_factory=list)
+    generic_parameters: list[str] = field(default_factory=list)
     is_interface_member: bool = False
     is_enum: bool = False
     is_namespace: bool = False
-    access_modifier: Optional[str] = None  # public, private, protected
+    access_modifier: str | None = None  # public, private, protected
     is_readonly: bool = False
     is_optional: bool = False
     is_abstract: bool = False
 
-    def get_language_features(self) -> Dict[str, Any]:
+    def get_language_features(self) -> dict[str, Any]:
         """Get TypeScript-specific features."""
-        features = {
+        features: dict[str, Any] = {
             "has_type_annotation": self.has_type_annotation,
             "type_annotation": self.type_annotation,
             "is_generic": self.is_generic,
@@ -64,7 +64,7 @@ class TypeScriptNode(BaseNode):
         features.update(self.metadata)
         return features
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary including TypeScript-specific features."""
         base_dict = super().to_dict()
         base_dict.update(self.get_language_features())
@@ -77,9 +77,9 @@ class TypeScriptRelation(BaseRelation):
 
     # TypeScript-specific relation metadata
     is_type_constraint: bool = False
-    generic_type: Optional[str] = None
+    generic_type: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary including TypeScript-specific features."""
         base_dict = super().to_dict()
         base_dict["metadata"].update(
@@ -101,10 +101,10 @@ def create_typescript_function_node(
     start_line: int,
     end_line: int,
     source_code: str,
-    type_annotation: Optional[str] = None,
-    generic_parameters: Optional[List[str]] = None,
-    access_modifier: Optional[str] = None,
-    parent_id: Optional[str] = None,
+    type_annotation: str | None = None,
+    generic_parameters: list[str] | None = None,
+    access_modifier: str | None = None,
+    parent_id: str | None = None,
 ) -> TypeScriptNode:
     """Create a TypeScript function node with TypeScript-specific features."""
     return TypeScriptNode(
@@ -135,8 +135,8 @@ def create_typescript_interface_node(
     start_line: int,
     end_line: int,
     source_code: str,
-    generic_parameters: Optional[List[str]] = None,
-    parent_id: Optional[str] = None,
+    generic_parameters: list[str] | None = None,
+    parent_id: str | None = None,
 ) -> TypeScriptNode:
     """Create a TypeScript interface node with TypeScript-specific features."""
     return TypeScriptNode(
@@ -164,10 +164,10 @@ def create_typescript_class_node(
     start_line: int,
     end_line: int,
     source_code: str,
-    generic_parameters: Optional[List[str]] = None,
-    access_modifier: Optional[str] = None,
+    generic_parameters: list[str] | None = None,
+    access_modifier: str | None = None,
     is_abstract: bool = False,
-    parent_id: Optional[str] = None,
+    parent_id: str | None = None,
 ) -> TypeScriptNode:
     """Create a TypeScript class node with TypeScript-specific features."""
     return TypeScriptNode(

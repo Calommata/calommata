@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal
 
 # Language type definition
 LanguageType = Literal["python", "javascript", "typescript"]
@@ -26,20 +26,20 @@ class BaseNode(ABC):
 
     id: str  # Unique identifier (file_path:start_byte:end_byte)
     type: NodeType  # Base node type (function, class, etc.)
-    name: Optional[str]  # Identifier name if applicable
+    name: str | None  # Identifier name if applicable
     file_path: str
     start_byte: int
     end_byte: int
     start_line: int
     end_line: int
     source_code: str
-    parent_id: Optional[str] = None
+    parent_id: str | None = None
     language: LanguageType = "python"  # Language this node belongs to
 
     # Language-specific metadata
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for graph storage."""
         return {
             "id": self.id,
@@ -55,7 +55,7 @@ class BaseNode(ABC):
         }
 
     @abstractmethod
-    def get_language_features(self) -> Dict[str, Any]:
+    def get_language_features(self) -> dict[str, Any]:
         """Get language-specific features for this node.
 
         Returns:
@@ -71,9 +71,9 @@ class BaseRelation(ABC):
     from_id: str
     to_id: str
     relation_type: RelationType
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for graph storage."""
         return {
             "from": self.from_id,
@@ -81,20 +81,3 @@ class BaseRelation(ABC):
             "type": self.relation_type,
             "metadata": self.metadata,
         }
-
-
-# Backward compatibility - these are the classes used throughout the codebase
-@dataclass
-class ParsedNode(BaseNode):
-    """Backward compatibility wrapper for the existing ParsedNode."""
-
-    def get_language_features(self) -> Dict[str, Any]:
-        """Basic implementation for backward compatibility."""
-        return self.metadata
-
-
-@dataclass
-class ParsedRelation(BaseRelation):
-    """Backward compatibility wrapper for the existing ParsedRelation."""
-
-    pass

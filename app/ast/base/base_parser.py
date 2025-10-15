@@ -2,9 +2,9 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Tuple
+from typing import Tuple
 
-from app.ast.base_models import BaseNode, BaseRelation, LanguageType
+from app.ast.base.base_models import BaseNode, BaseRelation, LanguageType
 
 
 class BaseASTParser(ABC):
@@ -21,7 +21,7 @@ class BaseASTParser(ABC):
     @abstractmethod
     def parse(
         self, source_code: str, file_path: str
-    ) -> Tuple[List[BaseNode], List[BaseRelation]]:
+    ) -> Tuple[list[BaseNode], list[BaseRelation]]:
         """Parse source code and extract nodes and relationships.
 
         Args:
@@ -33,7 +33,7 @@ class BaseASTParser(ABC):
         """
         pass
 
-    def parse_file(self, file_path: str) -> Tuple[List[BaseNode], List[BaseRelation]]:
+    def parse_file(self, file_path: str) -> Tuple[list[BaseNode], list[BaseRelation]]:
         """Parse a source file and extract graph structure.
 
         Args:
@@ -46,7 +46,7 @@ class BaseASTParser(ABC):
         return self.parse(source_code, file_path)
 
     @abstractmethod
-    def get_supported_extensions(self) -> List[str]:
+    def get_supported_extensions(self) -> list[str]:
         """Get list of supported file extensions for this parser.
 
         Returns:

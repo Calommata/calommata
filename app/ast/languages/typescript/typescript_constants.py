@@ -1,9 +1,7 @@
 """TypeScript-specific AST constants and mappings."""
 
-from typing import Set
-
 # TypeScript-specific node types for definitions
-TYPESCRIPT_DEFINITION_TYPES: Set[str] = {
+TYPESCRIPT_DEFINITION_TYPES: set[str] = {
     "function_declaration",
     "function_signature",
     "class_declaration",
@@ -16,12 +14,12 @@ TYPESCRIPT_DEFINITION_TYPES: Set[str] = {
 }
 
 # TypeScript-specific call types
-TYPESCRIPT_CALL_TYPES: Set[str] = {
+TYPESCRIPT_CALL_TYPES: set[str] = {
     "call_expression",
 }
 
 # TypeScript-specific import types
-TYPESCRIPT_IMPORT_TYPES: Set[str] = {
+TYPESCRIPT_IMPORT_TYPES: set[str] = {
     "import_statement",
 }
 
@@ -39,7 +37,7 @@ TYPESCRIPT_NODE_TYPE_MAPPING: dict[str, str] = {
 }
 
 # TypeScript-specific parent definition types
-TYPESCRIPT_PARENT_DEFINITION_TYPES: Set[str] = {
+TYPESCRIPT_PARENT_DEFINITION_TYPES: set[str] = {
     "function_declaration",
     "function_signature",
     "class_declaration",
@@ -50,20 +48,20 @@ TYPESCRIPT_PARENT_DEFINITION_TYPES: Set[str] = {
 }
 
 # TypeScript-specific identifier types
-TYPESCRIPT_IDENTIFIER_TYPES: Set[str] = {
+TYPESCRIPT_IDENTIFIER_TYPES: set[str] = {
     "identifier",
     "type_identifier",
     "property_identifier",
 }
 
 # TypeScript-specific complex name types
-TYPESCRIPT_COMPLEX_NAME_TYPES: Set[str] = {
+TYPESCRIPT_COMPLEX_NAME_TYPES: set[str] = {
     "member_expression",
     "qualified_name",
 }
 
 # TypeScript access modifiers
-TYPESCRIPT_ACCESS_MODIFIERS: Set[str] = {
+TYPESCRIPT_ACCESS_MODIFIERS: set[str] = {
     "public",
     "private",
     "protected",
@@ -71,7 +69,7 @@ TYPESCRIPT_ACCESS_MODIFIERS: Set[str] = {
 }
 
 # TypeScript type annotation keywords
-TYPESCRIPT_TYPE_KEYWORDS: Set[str] = {
+TYPESCRIPT_TYPE_KEYWORDS: set[str] = {
     "string",
     "number",
     "boolean",
@@ -83,7 +81,7 @@ TYPESCRIPT_TYPE_KEYWORDS: Set[str] = {
 }
 
 # TypeScript generic and constraint keywords
-TYPESCRIPT_GENERIC_KEYWORDS: Set[str] = {
+TYPESCRIPT_GENERIC_KEYWORDS: set[str] = {
     "extends",
     "keyof",
     "typeof",

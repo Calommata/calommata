@@ -1,19 +1,18 @@
 """Python-specific AST parser with Python language features."""
 
-from typing import List, Tuple
+from typing import Tuple
 
 import tree_sitter_python as ts_python
 from tree_sitter import Language, Node, Parser
 
-from app.ast.base_models import BaseNode, BaseRelation
-from app.ast.base_parser import BaseASTParser
-from app.ast.languages.constants.python_constants import (
+from app.ast.base.base_models import BaseNode, BaseRelation
+from app.ast.base.base_parser import BaseASTParser
+from app.ast.languages.python.python_constants import (
     PYTHON_CALL_TYPES,
     PYTHON_DEFINITION_TYPES,
     PYTHON_IMPORT_TYPES,
-    PYTHON_NODE_TYPE_MAPPING,
 )
-from app.ast.languages.python_models import (
+from app.ast.languages.python.python_models import (
     PythonNode,
     PythonRelation,
     create_python_class_node,
@@ -31,18 +30,18 @@ class PythonParser(BaseASTParser):
         self.parser = Parser(Language(ts_python.language()))
         self.extractor = NodeExtractor()
 
-    def get_supported_extensions(self) -> List[str]:
+    def get_supported_extensions(self) -> list[str]:
         """Get supported Python file extensions."""
         return [".py", ".pyi", ".pyx"]
 
     def parse(
         self, source_code: str, file_path: str
-    ) -> Tuple[List[BaseNode], List[BaseRelation]]:
+    ) -> Tuple[list[BaseNode], list[BaseRelation]]:
         """Parse Python source code with Python-specific features."""
         tree = self.parser.parse(source_code.encode("utf-8"))
 
-        nodes: List[BaseNode] = []
-        relations: List[BaseRelation] = []
+        nodes: list[BaseNode] = []
+        relations: list[BaseRelation] = []
         definitions: dict[str, str] = {}  # name -> node_id
 
         def traverse(node: Node) -> None:
@@ -177,9 +176,9 @@ class PythonParser(BaseASTParser):
         node_source = source_code[node.start_byte : node.end_byte]
         return node_source.strip().startswith("async def")
 
-    def _extract_decorators(self, node: Node, source_code: str) -> List[str]:
+    def _extract_decorators(self, node: Node, source_code: str) -> list[str]:
         """Extract decorators from a function or class."""
-        decorators = []
+        decorators: list[str] = []
 
         # Look for decorator nodes in parent or preceding siblings
         if node.parent and node.parent.type == "decorated_definition":

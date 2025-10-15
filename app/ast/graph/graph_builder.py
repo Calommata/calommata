@@ -1,8 +1,8 @@
 """Graph builder for code structure."""
 
-from app.ast.graph import CodeGraph
-from app.ast.base_models import BaseNode, BaseRelation, LanguageType
-from app.ast.parser import parse_file
+from app.ast.graph.graph import CodeGraph
+from app.ast.base.base_models import BaseNode, BaseRelation, LanguageType
+from app.ast.parser_factory import ParserFactory
 
 
 class GraphBuilder:
@@ -93,7 +93,7 @@ def build_graph_from_files(file_paths: list[str]) -> CodeGraph:
     builder = GraphBuilder()
 
     for file_path in file_paths:
-        nodes, relations = parse_file(file_path)
+        nodes, relations = ParserFactory.parse_file(file_path)
         builder.add_nodes(nodes)
         builder.add_relations(relations)
 
@@ -118,7 +118,6 @@ def build_graph_from_files_with_language(
         ... ]
         >>> graph = build_graph_from_files_with_language(files)
     """
-    from app.ast.parser_factory import ParserFactory
 
     builder = GraphBuilder()
 

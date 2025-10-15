@@ -1,13 +1,13 @@
 """JavaScript-specific AST parser with JavaScript language features."""
 
-from typing import List, Tuple
+from typing import Tuple
 
 import tree_sitter_javascript as ts_javascript
 from tree_sitter import Language, Node, Parser
 
-from app.ast.base_models import BaseNode, BaseRelation, NodeType
-from app.ast.base_parser import BaseASTParser
-from app.ast.languages.javascript_models import (
+from app.ast.base.base_models import BaseNode, BaseRelation, NodeType
+from app.ast.base.base_parser import BaseASTParser
+from app.ast.languages.javascript.javascript_models import (
     JavaScriptNode,
     JavaScriptRelation,
     create_javascript_class_node,
@@ -40,18 +40,18 @@ class JavaScriptParser(BaseASTParser):
         self.parser = Parser(Language(ts_javascript.language()))
         self.extractor = NodeExtractor()
 
-    def get_supported_extensions(self) -> List[str]:
+    def get_supported_extensions(self) -> list[str]:
         """Get supported JavaScript file extensions."""
         return [".js", ".jsx", ".mjs", ".cjs"]
 
     def parse(
         self, source_code: str, file_path: str
-    ) -> Tuple[List[BaseNode], List[BaseRelation]]:
+    ) -> Tuple[list[BaseNode], list[BaseRelation]]:
         """Parse JavaScript source code with JavaScript-specific features."""
         tree = self.parser.parse(source_code.encode("utf-8"))
 
-        nodes: List[BaseNode] = []
-        relations: List[BaseRelation] = []
+        nodes: list[BaseNode] = []
+        relations: list[BaseRelation] = []
         definitions: dict[str, str] = {}  # name -> node_id
 
         def traverse(node: Node) -> None:

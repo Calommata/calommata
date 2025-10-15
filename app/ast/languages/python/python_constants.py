@@ -1,9 +1,7 @@
 """Python-specific AST constants and mappings."""
 
-from typing import Set
-
 # Python-specific node types for definitions
-PYTHON_DEFINITION_TYPES: Set[str] = {
+PYTHON_DEFINITION_TYPES: set[str] = {
     "function_definition",
     "async_function_definition",
     "class_definition",
@@ -11,12 +9,12 @@ PYTHON_DEFINITION_TYPES: Set[str] = {
 }
 
 # Python-specific call types
-PYTHON_CALL_TYPES: Set[str] = {
+PYTHON_CALL_TYPES: set[str] = {
     "call",
 }
 
 # Python-specific import types
-PYTHON_IMPORT_TYPES: Set[str] = {
+PYTHON_IMPORT_TYPES: set[str] = {
     "import_statement",
     "import_from_statement",
 }
@@ -30,7 +28,7 @@ PYTHON_NODE_TYPE_MAPPING: dict[str, str] = {
 }
 
 # Python-specific parent definition types for call relation extraction
-PYTHON_PARENT_DEFINITION_TYPES: Set[str] = {
+PYTHON_PARENT_DEFINITION_TYPES: set[str] = {
     "function_definition",
     "async_function_definition",
     "class_definition",
@@ -38,18 +36,18 @@ PYTHON_PARENT_DEFINITION_TYPES: Set[str] = {
 }
 
 # Python-specific identifier types
-PYTHON_IDENTIFIER_TYPES: Set[str] = {
+PYTHON_IDENTIFIER_TYPES: set[str] = {
     "identifier",
 }
 
 # Python-specific complex name types
-PYTHON_COMPLEX_NAME_TYPES: Set[str] = {
+PYTHON_COMPLEX_NAME_TYPES: set[str] = {
     "dotted_name",
     "attribute",
 }
 
 # Python-specific decorator keywords
-PYTHON_DECORATOR_KEYWORDS: Set[str] = {
+PYTHON_DECORATOR_KEYWORDS: set[str] = {
     "@property",
     "@staticmethod",
     "@classmethod",
@@ -59,14 +57,14 @@ PYTHON_DECORATOR_KEYWORDS: Set[str] = {
 }
 
 # Python async/await keywords
-PYTHON_ASYNC_KEYWORDS: Set[str] = {
+PYTHON_ASYNC_KEYWORDS: set[str] = {
     "async",
     "await",
     "async def",
 }
 
 # Python comprehension types
-PYTHON_COMPREHENSION_TYPES: Set[str] = {
+PYTHON_COMPREHENSION_TYPES: set[str] = {
     "list_comprehension",
     "dict_comprehension",
     "set_comprehension",
