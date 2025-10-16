@@ -1,0 +1,279 @@
+{
+  "nodes": {
+    "module": {
+      "type": "module",
+      "lines": "0-47",
+      "source_code": "\"\"\"User 모듈 - 사용자 관리\"\"\"\n\nfrom database import DatabaseConnection, QueryBuilder\n\n\nclass UserManager:\n    \"\"\"사용자 정보를 관리하는 클래스\"\"\"\n\n    def __init__(self, db_connection: DatabaseConnection):\n        self.db = db_connection\n        self.query_builder = QueryBuilder()\n\n    def get_user(self, user_id: int) -> dict:\n        \"\"\"사용자 정보 조회\"\"\"\n        query = (\n            self.query_builder.select(\"users\", [\"id\", \"name\", \"email\"])\n            .where(f\"id = {user_id}\")\n            .build()\n        )\n        return self._execute_query(query)\n\n    def create_user(self, name: str, email: str):\n        \"\"\"새로운 사용자 생성\"\"\"\n        query = f\"INSERT INTO users (name, email) VALUES ('{name}', '{email}')\"\n        self._execute_query(query)\n\n    def _execute_query(self, query: str):\n        \"\"\"데이터베이스 쿼리 실행\"\"\"\n        cursor = self.db.connection.cursor()\n        cursor.execute(query)\n        return cursor.fetchall()\n\n\nclass AuthenticationService:\n    \"\"\"사용자 인증 서비스\"\"\"\n\n    def __init__(self, user_manager: UserManager):\n        self.user_manager = user_manager\n\n    def authenticate(self, username: str, password: str) -> bool:\n        \"\"\"사용자 인증\"\"\"\n        user = self.user_manager.get_user(username)\n        return self._verify_password(password, user)\n\n    def _verify_password(self, password: str, user: dict) -> bool:\n        \"\"\"비밀번호 검증\"\"\"\n        return True  # 실제로는 해싱된 비밀번호와 비교\n",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.import": {
+      "type": "import",
+      "lines": "2-2",
+      "source_code": "from database import DatabaseConnection, QueryBuilder",
+      "imports": [
+        "database"
+      ],
+      "dependencies": []
+    },
+    "module.APIHandler": {
+      "type": "class",
+      "lines": "6-34",
+      "source_code": "class APIHandler:\n    \"\"\"API 요청을 처리하는 클래스\"\"\"\n\n    def __init__(self, auth_service: AuthenticationService):\n        self.auth_service = auth_service\n\n    def handle_request(self, request: dict) -> dict:\n        \"\"\"API 요청 처리\"\"\"\n        method = request.get(\"method\")\n        if method == \"login\":\n            return self._handle_login(request)\n        elif method == \"get_user\":\n            return self._handle_get_user(request)\n        return {\"error\": \"Unknown method\"}\n\n    def _handle_login(self, request: dict) -> dict:\n        \"\"\"로그인 요청 처리\"\"\"\n        username = request.get(\"username\")\n        password = request.get(\"password\")\n\n        if self.auth_service.authenticate(username, password):\n            return {\"status\": \"success\", \"message\": \"Login successful\"}\n        return {\"status\": \"fail\", \"message\": \"Invalid credentials\"}\n\n    def _handle_get_user(self, request: dict) -> dict:\n        \"\"\"사용자 정보 조회 요청 처리\"\"\"\n        user_id = request.get(\"user_id\")\n        user = self.auth_service.user_manager.get_user(user_id)\n        return {\"status\": \"success\", \"data\": user}",
+      "imports": [],
+      "dependencies": [
+        "AuthenticationService"
+      ]
+    },
+    "module.APIHandler.__init__": {
+      "type": "function",
+      "lines": "9-10",
+      "source_code": "def __init__(self, auth_service: AuthenticationService):\n        self.auth_service = auth_service",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.APIHandler.handle_request": {
+      "type": "function",
+      "lines": "12-19",
+      "source_code": "def handle_request(self, request: dict) -> dict:\n        \"\"\"API 요청 처리\"\"\"\n        method = request.get(\"method\")\n        if method == \"login\":\n            return self._handle_login(request)\n        elif method == \"get_user\":\n            return self._handle_get_user(request)\n        return {\"error\": \"Unknown method\"}",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.APIHandler._handle_login": {
+      "type": "function",
+      "lines": "21-28",
+      "source_code": "def _handle_login(self, request: dict) -> dict:\n        \"\"\"로그인 요청 처리\"\"\"\n        username = request.get(\"username\")\n        password = request.get(\"password\")\n\n        if self.auth_service.authenticate(username, password):\n            return {\"status\": \"success\", \"message\": \"Login successful\"}\n        return {\"status\": \"fail\", \"message\": \"Invalid credentials\"}",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.APIHandler._handle_get_user": {
+      "type": "function",
+      "lines": "30-34",
+      "source_code": "def _handle_get_user(self, request: dict) -> dict:\n        \"\"\"사용자 정보 조회 요청 처리\"\"\"\n        user_id = request.get(\"user_id\")\n        user = self.auth_service.user_manager.get_user(user_id)\n        return {\"status\": \"success\", \"data\": user}",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.ResponseFormatter": {
+      "type": "class",
+      "lines": "37-48",
+      "source_code": "class ResponseFormatter:\n    \"\"\"API 응답을 포맷팅하는 클래스\"\"\"\n\n    @staticmethod\n    def format_json(data: dict) -> str:\n        \"\"\"데이터를 JSON 문자열로 변환\"\"\"\n        return json.dumps(data, indent=2)\n\n    @staticmethod\n    def format_error(error_message: str, error_code: int = 500) -> dict:\n        \"\"\"에러 응답 생성\"\"\"\n        return {\"error\": error_message, \"code\": error_code}",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.ResponseFormatter.format_json": {
+      "type": "function",
+      "lines": "41-43",
+      "source_code": "def format_json(data: dict) -> str:\n        \"\"\"데이터를 JSON 문자열로 변환\"\"\"\n        return json.dumps(data, indent=2)",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.ResponseFormatter.format_error": {
+      "type": "function",
+      "lines": "46-48",
+      "source_code": "def format_error(error_message: str, error_code: int = 500) -> dict:\n        \"\"\"에러 응답 생성\"\"\"\n        return {\"error\": error_message, \"code\": error_code}",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.DatabaseConnection": {
+      "type": "class",
+      "lines": "6-20",
+      "source_code": "class DatabaseConnection:\n    \"\"\"데이터베이스 연결을 관리하는 클래스\"\"\"\n\n    def __init__(self, db_path: str):\n        self.db_path = db_path\n        self.connection = None\n\n    def connect(self):\n        \"\"\"데이터베이스에 연결\"\"\"\n        self.connection = sqlite3.connect(self.db_path)\n\n    def close(self):\n        \"\"\"데이터베이스 연결 종료\"\"\"\n        if self.connection:\n            self.connection.close()",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.DatabaseConnection.__init__": {
+      "type": "function",
+      "lines": "9-11",
+      "source_code": "def __init__(self, db_path: str):\n        self.db_path = db_path\n        self.connection = None",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.DatabaseConnection.connect": {
+      "type": "function",
+      "lines": "13-15",
+      "source_code": "def connect(self):\n        \"\"\"데이터베이스에 연결\"\"\"\n        self.connection = sqlite3.connect(self.db_path)",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.DatabaseConnection.close": {
+      "type": "function",
+      "lines": "17-20",
+      "source_code": "def close(self):\n        \"\"\"데이터베이스 연결 종료\"\"\"\n        if self.connection:\n            self.connection.close()",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.QueryBuilder": {
+      "type": "class",
+      "lines": "23-42",
+      "source_code": "class QueryBuilder:\n    \"\"\"SQL 쿼리를 생성하는 클래스\"\"\"\n\n    def __init__(self):\n        self.query = \"\"\n\n    def select(self, table: str, columns: List[str] = None) -> \"QueryBuilder\":\n        \"\"\"SELECT 쿼리 시작\"\"\"\n        cols = \", \".join(columns) if columns else \"*\"\n        self.query = f\"SELECT {cols} FROM {table}\"\n        return self\n\n    def where(self, condition: str) -> \"QueryBuilder\":\n        \"\"\"WHERE 조건 추가\"\"\"\n        self.query += f\" WHERE {condition}\"\n        return self\n\n    def build(self) -> str:\n        \"\"\"쿼리 완성\"\"\"\n        return self.query",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.QueryBuilder.__init__": {
+      "type": "function",
+      "lines": "26-27",
+      "source_code": "def __init__(self):\n        self.query = \"\"",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.QueryBuilder.select": {
+      "type": "function",
+      "lines": "29-33",
+      "source_code": "def select(self, table: str, columns: List[str] = None) -> \"QueryBuilder\":\n        \"\"\"SELECT 쿼리 시작\"\"\"\n        cols = \", \".join(columns) if columns else \"*\"\n        self.query = f\"SELECT {cols} FROM {table}\"\n        return self",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.QueryBuilder.where": {
+      "type": "function",
+      "lines": "35-38",
+      "source_code": "def where(self, condition: str) -> \"QueryBuilder\":\n        \"\"\"WHERE 조건 추가\"\"\"\n        self.query += f\" WHERE {condition}\"\n        return self",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.QueryBuilder.build": {
+      "type": "function",
+      "lines": "40-42",
+      "source_code": "def build(self) -> str:\n        \"\"\"쿼리 완성\"\"\"\n        return self.query",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.UserManager": {
+      "type": "class",
+      "lines": "5-30",
+      "source_code": "class UserManager:\n    \"\"\"사용자 정보를 관리하는 클래스\"\"\"\n\n    def __init__(self, db_connection: DatabaseConnection):\n        self.db = db_connection\n        self.query_builder = QueryBuilder()\n\n    def get_user(self, user_id: int) -> dict:\n        \"\"\"사용자 정보 조회\"\"\"\n        query = (\n            self.query_builder.select(\"users\", [\"id\", \"name\", \"email\"])\n            .where(f\"id = {user_id}\")\n            .build()\n        )\n        return self._execute_query(query)\n\n    def create_user(self, name: str, email: str):\n        \"\"\"새로운 사용자 생성\"\"\"\n        query = f\"INSERT INTO users (name, email) VALUES ('{name}', '{email}')\"\n        self._execute_query(query)\n\n    def _execute_query(self, query: str):\n        \"\"\"데이터베이스 쿼리 실행\"\"\"\n        cursor = self.db.connection.cursor()\n        cursor.execute(query)\n        return cursor.fetchall()",
+      "imports": [],
+      "dependencies": [
+        "DatabaseConnection"
+      ]
+    },
+    "module.UserManager.__init__": {
+      "type": "function",
+      "lines": "8-10",
+      "source_code": "def __init__(self, db_connection: DatabaseConnection):\n        self.db = db_connection\n        self.query_builder = QueryBuilder()",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.UserManager.get_user": {
+      "type": "function",
+      "lines": "12-19",
+      "source_code": "def get_user(self, user_id: int) -> dict:\n        \"\"\"사용자 정보 조회\"\"\"\n        query = (\n            self.query_builder.select(\"users\", [\"id\", \"name\", \"email\"])\n            .where(f\"id = {user_id}\")\n            .build()\n        )\n        return self._execute_query(query)",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.UserManager.create_user": {
+      "type": "function",
+      "lines": "21-24",
+      "source_code": "def create_user(self, name: str, email: str):\n        \"\"\"새로운 사용자 생성\"\"\"\n        query = f\"INSERT INTO users (name, email) VALUES ('{name}', '{email}')\"\n        self._execute_query(query)",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.UserManager._execute_query": {
+      "type": "function",
+      "lines": "26-30",
+      "source_code": "def _execute_query(self, query: str):\n        \"\"\"데이터베이스 쿼리 실행\"\"\"\n        cursor = self.db.connection.cursor()\n        cursor.execute(query)\n        return cursor.fetchall()",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.AuthenticationService": {
+      "type": "class",
+      "lines": "33-46",
+      "source_code": "class AuthenticationService:\n    \"\"\"사용자 인증 서비스\"\"\"\n\n    def __init__(self, user_manager: UserManager):\n        self.user_manager = user_manager\n\n    def authenticate(self, username: str, password: str) -> bool:\n        \"\"\"사용자 인증\"\"\"\n        user = self.user_manager.get_user(username)\n        return self._verify_password(password, user)\n\n    def _verify_password(self, password: str, user: dict) -> bool:\n        \"\"\"비밀번호 검증\"\"\"\n        return True  # 실제로는 해싱된 비밀번호와 비교",
+      "imports": [],
+      "dependencies": [
+        "UserManager"
+      ]
+    },
+    "module.AuthenticationService.__init__": {
+      "type": "function",
+      "lines": "36-37",
+      "source_code": "def __init__(self, user_manager: UserManager):\n        self.user_manager = user_manager",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.AuthenticationService.authenticate": {
+      "type": "function",
+      "lines": "39-42",
+      "source_code": "def authenticate(self, username: str, password: str) -> bool:\n        \"\"\"사용자 인증\"\"\"\n        user = self.user_manager.get_user(username)\n        return self._verify_password(password, user)",
+      "imports": [],
+      "dependencies": []
+    },
+    "module.AuthenticationService._verify_password": {
+      "type": "function",
+      "lines": "44-46",
+      "source_code": "def _verify_password(self, password: str, user: dict) -> bool:\n        \"\"\"비밀번호 검증\"\"\"\n        return True  # 실제로는 해싱된 비밀번호와 비교",
+      "imports": [],
+      "dependencies": []
+    }
+  },
+  "edges": {
+    "module": [
+      "module.import",
+      "sqlite3",
+      "database",
+      "module.AuthenticationService",
+      "module.ResponseFormatter",
+      "typing",
+      "module.APIHandler",
+      "module.UserManager",
+      "user",
+      "json",
+      "module.QueryBuilder",
+      "module.DatabaseConnection"
+    ],
+    "module.import": [],
+    "module.APIHandler": [
+      "module.APIHandler.__init__",
+      "module.APIHandler._handle_get_user",
+      "module.APIHandler.handle_request",
+      "module.APIHandler._handle_login"
+    ],
+    "module.APIHandler.__init__": [],
+    "module.APIHandler.handle_request": [],
+    "module.APIHandler._handle_login": [],
+    "module.APIHandler._handle_get_user": [],
+    "module.ResponseFormatter": [
+      "module.ResponseFormatter.format_json",
+      "module.ResponseFormatter.format_error"
+    ],
+    "module.ResponseFormatter.format_json": [],
+    "module.ResponseFormatter.format_error": [],
+    "module.DatabaseConnection": [
+      "module.DatabaseConnection.connect",
+      "module.DatabaseConnection.close",
+      "module.DatabaseConnection.__init__"
+    ],
+    "module.DatabaseConnection.__init__": [],
+    "module.DatabaseConnection.connect": [],
+    "module.DatabaseConnection.close": [],
+    "module.QueryBuilder": [
+      "module.QueryBuilder.__init__",
+      "module.QueryBuilder.select",
+      "module.QueryBuilder.where",
+      "module.QueryBuilder.build"
+    ],
+    "module.QueryBuilder.__init__": [],
+    "module.QueryBuilder.select": [],
+    "module.QueryBuilder.where": [],
+    "module.QueryBuilder.build": [],
+    "module.UserManager": [
+      "module.UserManager.create_user",
+      "module.UserManager.__init__",
+      "module.UserManager._execute_query",
+      "module.UserManager.get_user",
+      "module.DatabaseConnection"
+    ],
+    "module.UserManager.__init__": [],
+    "module.UserManager.get_user": [],
+    "module.UserManager.create_user": [],
+    "module.UserManager._execute_query": [],
+    "module.AuthenticationService": [
+      "module.UserManager",
+      "module.AuthenticationService.__init__",
+      "module.AuthenticationService._verify_password",
+      "module.AuthenticationService.authenticate"
+    ],
+    "module.AuthenticationService.__init__": [],
+    "module.AuthenticationService.authenticate": [],
+    "module.AuthenticationService._verify_password": []
+  }
+}

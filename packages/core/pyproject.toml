@@ -1,0 +1,42 @@
+[project]
+name = "code-analyzer-core"
+version = "0.1.0"
+description = "Interact with LLM and control db"
+requires-python = ">=3.13"
+dependencies = []
+
+[tool.uv.sources]
+ast-parser = { path = "../parser" }
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [ "ALL",]
+ignore = [
+    "C90",     # McCabe complexity
+    "COM812",  # Messes with the formatter
+    "CPY",     # No copyright
+    "FIX002",  # Line contains TODO
+    "ISC001",  # Messes with the formatter
+    "PERF203", # Rarely useful
+    "PLR09",   # Too many something (arg, statements, etc)
+    "RUF012",  # Doesn't play well with Pydantic
+    "TC001",   # Doesn't play well with Pydantic
+    "TC002",   # Doesn't play well with Pydantic
+    "TC003",   # Doesn't play well with Pydantic
+    "TD002",   # Missing author in TODO
+    "TD003",   # Missing issue link in TODO
+    "ANN401",  # No Any types
+    "BLE",     # Blind exceptions
+    "ERA",     # No commented-out code
+    "PLR2004", # Comparison to magic number
+]
+unfixable = [
+    "B028",    # People should intentionally tune the stacklevel
+    "PLW1510", # People should intentionally set the check argument
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+ignore-var-parameters = true  # ignore missing documentation for *args and **kwargs parameters
