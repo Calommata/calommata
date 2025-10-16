@@ -6,13 +6,11 @@
     ↓
 [CLI: 변경된 파일 수집]
     ↓
-[Server: 파일 수신]
+[CLI: AST 파싱]
     ↓
-[Server: AST 파싱]
+[CLI: 벡터/그래프 DB 저장]
     ↓
-[Server: 벡터/그래프 DB 저장]
-    ↓
-[Server: LLM 분석]
+[CLI: LLM 분석]
     ↓
 [응답]
 
