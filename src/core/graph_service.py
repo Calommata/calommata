@@ -26,7 +26,7 @@ class GraphService(BaseModel):
     전체 파이프라인을 관리합니다.
     """
 
-    persistence: Any = Field(..., description="Neo4j 지속성 객체")
+    persistence: Neo4jPersistence = Field(..., description="Neo4j 지속성 객체")
     embedder: CodeEmbedder = Field(..., description="코드 임베딩 생성기")
     project_name: str = Field(..., description="프로젝트 이름")
 
@@ -77,7 +77,7 @@ class GraphService(BaseModel):
 
         # 5. Neo4j에 저장
         self.persistence.save_code_graph(graph, self.project_name)
-        logger.info(f"✅ Neo4j 저장 완료")
+        logger.info("✅ Neo4j 저장 완료")
 
         return graph
 
@@ -117,7 +117,7 @@ class GraphService(BaseModel):
 
         # 4. Neo4j에 저장
         self.persistence.save_code_graph(graph, self.project_name)
-        logger.info(f"✅ Neo4j 저장 완료")
+        logger.info("✅ Neo4j 저장 완료")
 
         return graph
 
@@ -161,7 +161,7 @@ class GraphService(BaseModel):
                 logger.error(f"❌ 배치 임베딩 실패: {e}")
                 continue
 
-        logger.info(f"✅ 전체 임베딩 생성 완료")
+        logger.info("✅ 전체 임베딩 생성 완료")
 
     def update_embeddings(
         self,

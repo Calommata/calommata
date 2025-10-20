@@ -7,7 +7,8 @@ Ollama를 통한 로컬 LLM과 HuggingFace 모델을 모두 지원합니다.
 import logging
 from typing import Any, Literal
 
-from langchain_community.embeddings import HuggingFaceEmbeddings, OllamaEmbeddings
+from langchain_community.embeddings import OllamaEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)

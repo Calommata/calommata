@@ -93,7 +93,7 @@ def create_agent_only(
     embedder: CodeEmbedder,
     retriever: CodeRetriever,
     llm_api_key: str,
-    model_name: str = "gemini-2.0-flash-exp",
+    model_name: str = "gemini-2.5-flash",
     temperature: float = 0.1,
 ) -> CodeRAGAgent:
     """Agent만 생성

@@ -53,9 +53,7 @@ class CodeRAGAgent(BaseModel):
     embedder: CodeEmbedder = Field(..., description="코드 임베딩 생성기")
     retriever: CodeRetriever = Field(..., description="코드 검색 리트리버")
     llm_api_key: str = Field(..., description="Google Gemini API 키")
-    model_name: str = Field(
-        default="gemini-2.0-flash-exp", description="사용할 LLM 모델"
-    )
+    model_name: str = Field(default="gemini-2.5-flash", description="사용할 LLM 모델")
     temperature: float = Field(default=0.1, description="LLM 온도")
     max_tokens: int = Field(default=4096, description="최대 토큰 수")
 

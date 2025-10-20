@@ -263,6 +263,9 @@ class ASTExtractor:
         """함수 호출 관계 분석"""
         if node.type == "call":
             self._process_function_call(node, blocks)
+        elif node.type == "attribute":
+            # obj.method() 형태의 호출도 분석
+            self._process_attribute_call(node, blocks)
 
         # 자식 노드들 재귀 순회
         for child in node.children:
@@ -276,13 +279,25 @@ class ASTExtractor:
         if not caller_block:
             return
 
+        # dependencies 리스트가 None인 경우 초기화
+        if caller_block.dependencies is None:
+            caller_block.dependencies = []
+
         called_func = self._extract_called_function_name(call_node)
-        if (
-            caller_block.dependencies
-            and called_func
-            and called_func not in caller_block.dependencies
-        ):
+        if called_func and called_func not in caller_block.dependencies:
             caller_block.dependencies.append(called_func)
+
+        # 추가: 생성자 호출도 감지 (Calculator() 형태)
+        call_text = self._get_node_text(call_node)
+        if call_text and "(" in call_text:
+            constructor_name = call_text.split("(")[0].strip()
+            # 대문자로 시작하면 클래스 생성자일 가능성
+            if (
+                constructor_name
+                and constructor_name[0].isupper()
+                and constructor_name not in caller_block.dependencies
+            ):
+                caller_block.dependencies.append(constructor_name)
 
     def _find_containing_block(
         self, line: int, blocks: list[CodeBlock]
@@ -307,6 +322,22 @@ class ASTExtractor:
         else:
             # 함수 호출: func()
             return func_part
+
+    def _process_attribute_call(self, attr_node: Node, blocks: list[CodeBlock]):
+        """속성 접근 처리 (obj.method 형태)"""
+        attr_line = attr_node.start_point[0]
+        caller_block = self._find_containing_block(attr_line, blocks)
+
+        if not caller_block or not caller_block.dependencies:
+            return
+
+        # 속성 이름 추출
+        attr_text = self._get_node_text(attr_node)
+        if "." in attr_text:
+            # obj.method에서 method 추출
+            method_name = attr_text.split(".")[-1]
+            if method_name and method_name not in caller_block.dependencies:
+                caller_block.dependencies.append(method_name)
 
     def _extract_docstring(self, node: Node) -> str | None:
         """클래스나 함수에서 docstring 추출"""

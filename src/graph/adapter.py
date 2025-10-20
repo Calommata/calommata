@@ -51,8 +51,9 @@ class ParserToGraphAdapter:
             file_path = getattr(block, "file_path", "unknown.py")
             node_map[f"{file_path}:{block.name}"] = node.id
 
-        # 2단계: 관계 생성 (CodeBlock의 dependencies 활용)
+        # 2단계: 관계 생성 (CodeBlock의 dependencies 활용 + 기본 관계)
         for block in code_blocks:
+            # 기존 dependencies 기반 관계
             if hasattr(block, "dependencies") and block.dependencies:
                 for dep_target in block.dependencies:
                     relation = self._create_relation_from_string_dependency(
@@ -64,6 +65,9 @@ class ParserToGraphAdapter:
                         except ValueError:
                             # 존재하지 않는 노드에 대한 관계는 무시
                             continue
+
+            # 기본 관계 생성 (클래스 -> 메서드, 모듈 -> 함수/클래스)
+            self._create_basic_relationships(block, code_blocks, graph, node_map)
 
         # 통계 정보 업데이트
         self._update_graph_statistics(graph)
@@ -158,20 +162,112 @@ class ParserToGraphAdapter:
 
         file_path = getattr(block, "file_path", "unknown.py")
         source_key = f"{file_path}:{block.name}"
-        target_key = f"{file_path}:{target_name}"  # 같은 파일 내 가정
 
-        if source_key not in node_map or target_key not in node_map:
-            return None
+        # 1. 같은 파일 내에서 찾기
+        target_key = f"{file_path}:{target_name}"
+        if source_key in node_map and target_key in node_map:
+            return CodeRelation(
+                from_node_id=node_map[source_key],
+                to_node_id=node_map[target_key],
+                relation_type=RelationType.CALLS,  # 같은 파일 내는 호출 관계
+                context=f"same_file_call: {target_name}",
+                line_number=getattr(block, "start_line", 0),  # 기본값 설정
+            )
 
-        # 기본 관계 타입 사용
-        relation_type = RelationType.REFERENCES
+        # 2. 다른 파일에서 찾기 (모든 파일에서 해당 이름 검색)
+        for key in node_map.keys():
+            if key.endswith(f":{target_name}") and key != target_key:
+                return CodeRelation(
+                    from_node_id=node_map[source_key],
+                    to_node_id=node_map[key],
+                    relation_type=RelationType.CALLS,  # 다른 파일 간 호출 관계
+                    context=f"cross_file_call: {target_name}",
+                    line_number=getattr(block, "start_line", 0),  # 기본값 설정
+                )
 
-        return CodeRelation(
-            from_node_id=node_map[source_key],
-            to_node_id=node_map[target_key],
-            relation_type=relation_type,
-            context="dependency_type: references",
-        )
+        # 3. import 관계 처리 (dependency가 'import_'로 시작하는 경우)
+        if target_name.startswith("import_"):
+            import_name = target_name.replace("import_", "")
+            for key in node_map.keys():
+                if key.endswith(f":{import_name}") or key.endswith(f":{target_name}"):
+                    return CodeRelation(
+                        from_node_id=node_map[source_key],
+                        to_node_id=node_map[key],
+                        relation_type=RelationType.IMPORTS,
+                        context=f"import: {import_name}",
+                    )
+
+        return None
+
+    def _create_basic_relationships(
+        self, block, code_blocks: list, graph: CodeGraph, node_map: dict
+    ) -> None:
+        """기본적인 구조적 관계 생성"""
+
+        file_path = getattr(block, "file_path", "unknown.py")
+
+        # 1. 클래스 -> 메서드 관계 (CONTAINS)
+        if block.block_type == "class":
+            for other_block in code_blocks:
+                if (
+                    other_block.block_type == "function"
+                    and getattr(other_block, "file_path", "") == file_path
+                    and other_block.start_line > block.start_line
+                    and other_block.end_line <= block.end_line
+                ):
+                    source_key = f"{file_path}:{block.name}"
+                    target_key = f"{file_path}:{other_block.name}"
+
+                    if source_key in node_map and target_key in node_map:
+                        relation = CodeRelation(
+                            from_node_id=node_map[source_key],
+                            to_node_id=node_map[target_key],
+                            relation_type=RelationType.CONTAINS,
+                            context="structural: class contains method",
+                            line_number=block.start_line,  # 기본값 설정
+                        )
+                        try:
+                            graph.add_relation(relation)
+                        except ValueError:
+                            pass
+
+        # 2. 모듈 -> 최상위 요소 관계 (CONTAINS)
+        elif block.block_type == "module":
+            for other_block in code_blocks:
+                if (
+                    getattr(other_block, "file_path", "") == file_path
+                    and other_block.block_type in ["class", "function"]
+                    and other_block != block
+                ):
+                    # 최상위 요소인지 확인 (다른 클래스 안에 있지 않음)
+                    is_top_level = True
+                    for container_block in code_blocks:
+                        if (
+                            container_block.block_type == "class"
+                            and container_block != other_block
+                            and getattr(container_block, "file_path", "") == file_path
+                            and container_block.start_line < other_block.start_line
+                            and container_block.end_line >= other_block.end_line
+                        ):
+                            is_top_level = False
+                            break
+
+                    if is_top_level:
+                        source_key = f"{file_path}:{block.name}"
+                        target_key = f"{file_path}:{other_block.name}"
+
+                        if source_key in node_map and target_key in node_map:
+                            relation = CodeRelation(
+                                from_node_id=node_map[source_key],
+                                to_node_id=node_map[target_key],
+                                relation_type=RelationType.CONTAINS,
+                                context="structural: module contains top-level element",
+                                line_number=other_block.start_line,  # 기본값 설정
+                            )
+                            try:
+                                graph.add_relation(relation)
+                            except ValueError:
+                                pass
 
     def _map_block_type_from_enum(self, block_type_enum) -> NodeType:
         """BlockType enum을 NodeType enum으로 매핑"""

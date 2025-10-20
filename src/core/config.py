@@ -3,6 +3,10 @@
 import os
 from typing import Any
 from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 
 class Neo4jConfig(BaseModel):
@@ -27,18 +31,25 @@ class EmbeddingConfig(BaseModel):
     """임베딩 모델 설정"""
 
     provider: str = Field(
-        default="ollama", description="임베딩 제공자 (ollama/huggingface)"
+        default_factory=lambda: os.getenv("EMBEDDING_PROVIDER", "huggingface"),
+        description="임베딩 제공자 (ollama/huggingface)",
     )
     model_name: str = Field(
-        default="nomic-embed-text",
+        default_factory=lambda: os.getenv(
+            "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
+        ),
         description="임베딩 모델 이름",
     )
     # Ollama 설정
     ollama_base_url: str = Field(
-        default="http://localhost:11434", description="Ollama 서버 URL"
+        default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+        description="Ollama 서버 URL",
     )
     # HuggingFace 설정
-    device: str = Field(default="cpu", description="실행 디바이스 (cpu/cuda)")
+    device: str = Field(
+        default_factory=lambda: os.getenv("EMBEDDING_DEVICE", "cpu"),
+        description="실행 디바이스 (cpu/cuda)",
+    )
     normalize: bool = Field(default=True, description="임베딩 정규화 여부")
 
 
@@ -59,9 +70,21 @@ class LLMConfig(BaseModel):
         default_factory=lambda: os.getenv("GOOGLE_API_KEY", ""),
         description="Google Gemini API 키",
     )
-    model_name: str = Field(default="gemini-2.0-flash-exp", description="LLM 모델 이름")
-    temperature: float = Field(default=0.1, ge=0.0, le=1.0, description="LLM 온도")
-    max_tokens: int = Field(default=4096, ge=1, description="최대 토큰 수")
+    model_name: str = Field(
+        default_factory=lambda: os.getenv("LLM_MODEL", "gemini-2.0-flash"),
+        description="LLM 모델 이름",
+    )
+    temperature: float = Field(
+        default_factory=lambda: float(os.getenv("LLM_TEMPERATURE", "0.1")),
+        ge=0.0,
+        le=1.0,
+        description="LLM 온도",
+    )
+    max_tokens: int = Field(
+        default_factory=lambda: int(os.getenv("LLM_MAX_TOKENS", "4096")),
+        ge=1,
+        description="최대 토큰 수",
+    )
 
 
 class CoreConfig(BaseModel):
@@ -72,7 +95,10 @@ class CoreConfig(BaseModel):
     retriever: RetrieverConfig = Field(default_factory=RetrieverConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
 
-    project_name: str = Field(default="code-analyzer", description="프로젝트 이름")
+    project_name: str = Field(
+        default_factory=lambda: os.getenv("PROJECT_NAME", "code-analyzer"),
+        description="프로젝트 이름",
+    )
 
     @classmethod
     def from_env(cls) -> "CoreConfig":

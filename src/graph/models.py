@@ -169,6 +169,7 @@ class CodeNode(BaseModel):
             "return_type": self.return_type,
             "decorators": self.decorators,
             "imports": self.imports,
+            "embedding": self.embedding_vector,
             "embedding_model": self.embedding_model,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),

@@ -48,7 +48,7 @@ class CodeSearchResult(BaseModel):
         context += f"**Code:**\n```python\n{self.source_code}\n```\n\n"
 
         if self.related_nodes:
-            context += f"**Related Components:**\n"
+            context += "**Related Components:**\n"
             for node in self.related_nodes[:5]:  # 최대 5개만
                 context += (
                     f"- {node.get('type', 'Unknown')}: {node.get('name', 'Unknown')}\n"
@@ -64,7 +64,7 @@ class CodeRetriever(BaseModel):
     관련 코드를 효과적으로 찾아냅니다.
     """
 
-    persistence: Any = Field(..., description="Neo4j 지속성 객체")
+    persistence: Neo4jPersistence = Field(..., description="Neo4j 지속성 객체")
 
     similarity_threshold: float = Field(default=0.5, description="유사도 임계값 (0-1)")
 

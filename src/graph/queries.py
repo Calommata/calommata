@@ -20,26 +20,25 @@ class Neo4jQueries:
         "CREATE TEXT INDEX code_node_content IF NOT EXISTS FOR (n:CodeNode) ON (n.source_code)",
     ]
 
-    # 로컬 LLM 모델에 최적화된 벡터 인덱스
-    # nomic-embed-text는 768차원, cosine 유사도 사용
+    # HuggingFace 모델용 벡터 인덱스 (384차원 - sentence-transformers/all-MiniLM-L6-v2)
     VECTOR_INDEX = """
         CREATE VECTOR INDEX code_embedding_index IF NOT EXISTS 
         FOR (n:CodeNode) ON (n.embedding) 
         OPTIONS {
             indexConfig: {
-                `vector.dimensions`: 768,
+                `vector.dimensions`: 384,
                 `vector.similarity_function`: 'cosine'
             }
         }
     """
 
-    # HuggingFace 모델용 백업 인덱스 (384차원)
-    VECTOR_INDEX_HF = """
-        CREATE VECTOR INDEX code_embedding_index_hf IF NOT EXISTS 
+    # 다른 모델용 벡터 인덱스 (768차원)
+    VECTOR_INDEX_LARGE = """
+        CREATE VECTOR INDEX code_embedding_index_large IF NOT EXISTS 
         FOR (n:CodeNode) ON (n.embedding) 
         OPTIONS {
             indexConfig: {
-                `vector.dimensions`: 384,
+                `vector.dimensions`: 768,
                 `vector.similarity_function`: 'cosine'
             }
         }
@@ -82,6 +81,7 @@ class Neo4jQueries:
             n.scope_level = node_data.scope_level,
             n.embedding = node_data.embedding,
             n.embedding_model = node_data.embedding_model,
+            n.project_name = $project_name,
             n.created_at = node_data.created_at,
             n.updated_at = datetime()
         
@@ -118,7 +118,8 @@ class Neo4jQueries:
     VECTOR_SEARCH = """
         CALL db.index.vector.queryNodes('code_embedding_index', $limit, $query_embedding)
         YIELD node, score
-        WHERE score >= $similarity_threshold
+        WHERE score >= $similarity_threshold 
+          AND (node.project_name = $project_name OR $project_name IS NULL)
         RETURN node.id AS id,
                node.name AS name,
                node.type AS type,
@@ -131,7 +132,7 @@ class Neo4jQueries:
 
     GET_NODE_CONTEXT = """
         MATCH (center:CodeNode {id: $node_id})
-        OPTIONAL MATCH path = (center)-[*1..$depth]-(related:CodeNode)
+        OPTIONAL MATCH path = (center)-[*1..2]-(related:CodeNode)
         WITH center, collect(DISTINCT related) AS related_nodes,
              collect(DISTINCT relationships(path)) AS all_relationships
         

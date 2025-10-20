@@ -89,9 +89,31 @@ class Neo4jPersistence:
             PersistenceConnectionError: 연결 실패 시
         """
         try:
-            self._driver = GraphDatabase.driver(
-                self.uri, auth=(self.user, self.password)
-            )
+            # SSL 인증서 검증을 우회하기 위한 설정
+            import ssl
+
+            # SSL 컨텍스트 생성 (인증서 검증 비활성화)
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+
+            # URI 스킴에 따른 연결 설정
+            if self.uri.startswith("neo4j+s://") or self.uri.startswith("bolt+s://"):
+                # SSL 사용하는 경우 SSL 컨텍스트 적용
+                uri_without_ssl = self.uri.replace("neo4j+s://", "neo4j://").replace(
+                    "bolt+s://", "bolt://"
+                )
+                self._driver = GraphDatabase.driver(
+                    uri_without_ssl,
+                    auth=(self.user, self.password),
+                    encrypted=True,
+                    ssl_context=ssl_context,
+                )
+            else:
+                # 일반적인 연결
+                self._driver = GraphDatabase.driver(
+                    self.uri, auth=(self.user, self.password)
+                )
             # 연결 테스트
             with self._driver.session() as session:
                 session.run(self._queries.TEST_CONNECTION)
@@ -432,6 +454,7 @@ class Neo4jPersistence:
         query_embedding: list[float],
         limit: int = 10,
         similarity_threshold: float = 0.7,
+        project_name: str | None = None,
     ) -> list[dict[str, Any]]:
         """벡터 유사도 기반 검색
 
@@ -450,6 +473,7 @@ class Neo4jPersistence:
                     query_embedding=query_embedding,
                     limit=limit,
                     similarity_threshold=similarity_threshold,
+                    project_name=project_name,
                 )
 
                 results = [record.data() for record in result]
@@ -472,9 +496,57 @@ class Neo4jPersistence:
         """
         try:
             with self.driver.session() as session:
-                result = session.run(
-                    self._queries.GET_NODE_CONTEXT, node_id=node_id, depth=depth
-                )
+                # 깊이에 따른 다른 쿼리 사용 (타입 안전성을 위해)
+                if depth == 1:
+                    query = """
+                        MATCH (center:CodeNode {id: $node_id})
+                        OPTIONAL MATCH path = (center)-[*1..1]-(related:CodeNode)
+                        WITH center, collect(DISTINCT related) AS related_nodes,
+                             [rel IN collect(DISTINCT relationships(path)) WHERE rel IS NOT NULL | rel] AS all_relationship_lists
+                        
+                        RETURN center,
+                               related_nodes,
+                               [rel IN reduce(flat = [], list IN all_relationship_lists | flat + list) WHERE rel IS NOT NULL | {
+                                   type: type(rel),
+                                   start_node: startNode(rel).id,
+                                   end_node: endNode(rel).id,
+                                   properties: properties(rel)
+                               }] AS relationships
+                    """
+                elif depth == 3:
+                    query = """
+                        MATCH (center:CodeNode {id: $node_id})
+                        OPTIONAL MATCH path = (center)-[*1..3]-(related:CodeNode)
+                        WITH center, collect(DISTINCT related) AS related_nodes,
+                             [rel IN collect(DISTINCT relationships(path)) WHERE rel IS NOT NULL | rel] AS all_relationship_lists
+                        
+                        RETURN center,
+                               related_nodes,
+                               [rel IN reduce(flat = [], list IN all_relationship_lists | flat + list) WHERE rel IS NOT NULL | {
+                                   type: type(rel),
+                                   start_node: startNode(rel).id,
+                                   end_node: endNode(rel).id,
+                                   properties: properties(rel)
+                               }] AS relationships
+                    """
+                else:  # depth == 2 (기본값)
+                    query = """
+                        MATCH (center:CodeNode {id: $node_id})
+                        OPTIONAL MATCH path = (center)-[*1..2]-(related:CodeNode)
+                        WITH center, collect(DISTINCT related) AS related_nodes,
+                             [rel IN collect(DISTINCT relationships(path)) WHERE rel IS NOT NULL | rel] AS all_relationship_lists
+                        
+                        RETURN center,
+                               related_nodes,
+                               [rel IN reduce(flat = [], list IN all_relationship_lists | flat + list) WHERE rel IS NOT NULL | {
+                                   type: type(rel),
+                                   start_node: startNode(rel).id,
+                                   end_node: endNode(rel).id,
+                                   properties: properties(rel)    
+                               }] AS relationships
+                    """
+
+                result = session.run(query, node_id=node_id)
                 record = result.single()
 
                 if record:
