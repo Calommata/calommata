@@ -24,7 +24,7 @@ def test_parser_to_graph():
         parser_dir = project_root / "packages" / "parser"
         sys.path.insert(0, str(parser_dir))
 
-        from parser.main.graph_builder import CodeAnalyzer
+        from parser.src.graph_builder import CodeAnalyzer
 
         analyzer = CodeAnalyzer()
 

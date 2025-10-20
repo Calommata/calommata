@@ -1,14 +1,22 @@
-"""
-Parser 패키지 pytest 테스트
-Tree-sitter를 사용한 코드 분석 테스트
+"""Parser 패키지 pytest 테스트
+
+Tree-sitter를 사용한 코드 분석의 통합 테스트 스위트입니다.
+CodeAnalyzer, CodeBlock, AST 추출기 등의 기능을 검증합니다.
+
+Test Coverage:
+- Parser 초기화 및 기본 동작
+- 파일 분석 및 디렉토리 분석
+- CodeBlock 모델 및 의존성
+- docstring 추출
+- 통합 워크플로우
 """
 
 from pathlib import Path
 
 import pytest
 
-from main.code_block import CodeBlock, DependencyType
-from main.graph_builder import CodeAnalyzer
+from src.code_block import BlockType, CodeBlock, DependencyType
+from src.graph_builder import CodeAnalyzer
 
 # 현재 디렉토리 reference
 current_dir = Path(__file__).parent.parent

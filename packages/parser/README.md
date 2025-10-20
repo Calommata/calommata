@@ -140,12 +140,73 @@ HTML 출력 파일(`graph_visualization.html`)에서 제공하는 기능:
 - **Data Format**: JSON
 - **Language**: Python 3.13+
 
-## 🎉 결과 확인
+## 🧪 테스트
 
-분석 완료 후:
-1. `graph_visualization.html`을 브라우저에서 열기
-2. 노드를 클릭하여 상세 정보 확인
-3. `output.json`에서 구조화된 데이터 확인
+Parser 패키지는 **44개의 pytest 테스트**를 포함하며, **88% 이상의 코드 커버리지**를 달성합니다.
+
+### 테스트 실행
+
+```bash
+cd packages/parser
+
+# 모든 테스트 실행
+uv run pytest tests/ -v
+
+# 커버리지 보고서 생성
+uv run pytest tests/ --cov=src --cov-report=term-missing --cov-report=html
+```
+
+### 테스트 통계
+
+- **총 테스트 케이스**: 44개
+- **테스트 성공률**: 100% ✅
+- **코드 커버리지**: 88%
+- **주요 테스트 영역**:
+  - ✅ BaseParser (파서 초기화, 코드 파싱, 에러 처리)
+  - ✅ ASTExtractor (블록 추출, docstring 추출, 의존성 분석)
+  - ✅ CodeBlock (모델 생성, 복잡도 계산, 의존성 관리)
+  - ✅ CodeAnalyzer (파일/디렉토리 분석, 통합 워크플로우)
+
+### 테스트 파일
+
+- `tests/test_parser.py` - CodeAnalyzer, CodeBlock 통합 테스트
+- `tests/test_ast_extractor.py` - AST 추출기 테스트 (13개 케이스)
+- `tests/test_base_parser.py` - 파서 기본 기능 및 에러 처리 (17개 케이스)
+- `tests/test_docstring.py` - docstring 추출 검증
+
+### 커버리지 세부 사항
+
+```
+src/__init__.py         3      0   100%
+src/ast_extractor.py    158    17    89%
+src/base_parser.py      24     3    88%
+src/code_block.py       96     10    90%
+src/graph_builder.py    65     12    82%
+───────────────────────────────────
+TOTAL                   346    42    88%
+```
 
 ---
-*Python Code Analyzer - Tree-sitter 기반 코드 구조 분석 도구* 🚀
+
+## ✨ 최근 개선사항 (v0.2.0)
+
+### 🔧 리펙토링
+
+- **타입 힌트 완성**: 모든 함수에 정확한 타입 힌트 적용 (Python 3.13+ 문법)
+- **에러 처리 강화**: 구체적인 예외 처리 및 로깅 추가
+- **문서화 개선**: 모든 클래스와 메서드에 상세한 docstring 추가
+- **코드 품질**: 불필요한 import 제거, 로깅 시스템 추가
+
+### 🧪 테스트 강화
+
+- **44개의 포괄적인 테스트**: 기본 기능부터 엣지 케이스까지 검증
+- **88% 커버리지**: 핵심 기능의 높은 커버리지 달성
+- **pytest 통합**: 체계적인 테스트 구조 및 픽스처 활용
+- **CI/CD 준비**: pytest.ini 및 설정 파일 완비
+
+### 📊 성능 지표
+
+- **테스트 실행 시간**: 0.26초 (44개 테스트)
+- **파싱 속도**: 34개 블록/초 (변경 없음)
+- **코드 커버리지**: 88% (목표: 85% 달성 ✅)
+

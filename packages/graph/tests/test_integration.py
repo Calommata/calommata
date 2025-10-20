@@ -24,7 +24,7 @@ class TestParserGraphIntegration:
     def test_real_parser_to_graph_conversion(self):
         """실제 Parser 결과를 Graph로 변환"""
         try:
-            from main.graph_builder import CodeAnalyzer
+            from src.graph_builder import CodeAnalyzer
 
             # Parser로 코드 분석
             analyzer = CodeAnalyzer()

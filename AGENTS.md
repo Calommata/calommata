@@ -43,7 +43,7 @@ Code Analyzer는 Python 코드를 분석하여 그래프 구조로 변환하고,
 ### 💾 Core Package
 - **위치**: `packages/core/`
 - **역할**: 데이터베이스 관리 및 AI 서비스
-- **기술 스택**: Neo4j, OpenAI/Local Embeddings, Google Gemini 2.5 Flash
+- **기술 스택**: Neo4j, LangChain, LangGraph
 - **주요 기능**:
   - Neo4j 데이터베이스 연결 및 관리
   - 코드 임베딩 생성 (로컬 모델)
@@ -111,9 +111,8 @@ Code Analyzer는 Python 코드를 분석하여 그래프 구조로 변환하고,
 - **Vector Index**: 임베딩 기반 검색
 
 ### AI & ML
-- **Google Gemini 2.5 Flash**: 대화형 AI 분석
 - **Sentence Transformers**: 로컬 임베딩 모델
-- **OpenAI API**: 대안 임베딩 서비스 (선택적)
+- **LangChain & LangGraph**: LLM 관리
 
 ## 📋 설치 및 실행
 
@@ -196,13 +195,3 @@ cd packages/core && uv run python simple_test.py
 **카테고리**: Code Analysis, Graph Database, AI/ML, Developer Tools
 **기술 키워드**: Python, Neo4j, Tree-sitter, GraphRAG, Embeddings
 **사용 사례**: Code Review, Documentation, Refactoring, Learning
-
----
-
-## 📞 개발자 정보
-
-**프로젝트 시작**: 2025년 10월
-**개발 상태**: 활발한 개발 중
-**라이센스**: MIT (예정)
-
-이 프로젝트는 AI 기반 코드 분석의 새로운 패러다임을 제시하며, 개발자의 생산성 향상과 코드 품질 개선을 목표로 합니다.

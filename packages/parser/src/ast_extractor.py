@@ -1,21 +1,36 @@
-from tree_sitter import Node, Tree
-from typing import List
-from .code_block import CodeBlock
+"""AST 추출기 - Tree-sitter를 사용하여 AST에서 코드 블록 추출"""
+
+import logging
 import re
+
+from tree_sitter import Node, Tree
+
+from .code_block import CodeBlock
+
+logger = logging.getLogger(__name__)
 
 
 class ASTExtractor:
-    """tree-sitter를 사용하여 AST에서 코드 블록 추출"""
+    """tree-sitter를 사용하여 AST에서 코드 블록 추출
 
-    def __init__(self, language):
-        """언어별 파서 초기화"""
+    Tree-sitter의 구문 트리를 분석하여 함수, 클래스, import 문 등의
+    코드 블록을 추출합니다.
+    """
+
+    def __init__(self, language: object) -> None:
+        """초기화
+
+        Args:
+            language: Tree-sitter 언어 객체
+        """
         self.language = language
+        logger.debug(f"ASTExtractor initialized with language: {language}")
 
     def extract_blocks(
         self, tree: Tree, source_code: str, file_path: str = ""
-    ) -> List[CodeBlock]:
+    ) -> list[CodeBlock]:
         """AST 트리에서 모든 블록 추출"""
-        blocks: List[CodeBlock] = []
+        blocks: list[CodeBlock] = []
 
         # 1. 모듈 블록 생성 (최상위)
         module_block = self._create_module_block(source_code, file_path)
@@ -45,7 +60,7 @@ class ASTExtractor:
         self,
         node: Node,
         parent: CodeBlock,
-        blocks: List[CodeBlock],
+        blocks: list[CodeBlock],
         file_path: str = "",
     ):
         """재귀적으로 노드 순회하여 블록 추출"""
@@ -161,7 +176,7 @@ class ASTExtractor:
                 return child.text.decode("utf-8")
         return f"unknown_{node_type}"
 
-    def _extract_import_names(self, import_node: Node) -> List[str]:
+    def _extract_import_names(self, import_node: Node) -> list[str]:
         """import 문에서 모듈명들 추출"""
         source = self._get_node_text(import_node)
         if not source.startswith("import "):
@@ -175,7 +190,7 @@ class ASTExtractor:
                 imports.append(module)
         return imports
 
-    def _extract_from_import_names(self, import_node: Node) -> List[str]:
+    def _extract_from_import_names(self, import_node: Node) -> list[str]:
         """from ... import 문에서 모듈명 추출"""
         source = self._get_node_text(import_node)
         if not (source.startswith("from ") and " import " in source):
@@ -188,7 +203,7 @@ class ASTExtractor:
                 return [module_part]
         return []
 
-    def _extract_class_dependencies(self, class_node: Node) -> List[str]:
+    def _extract_class_dependencies(self, class_node: Node) -> list[str]:
         """클래스의 의존성 추출 (상속, 타입 힌트 등)"""
         dependencies = set()
         source_code = self._get_node_text(class_node)
@@ -237,7 +252,7 @@ class ASTExtractor:
         }
         return type_name not in builtin_types
 
-    def _analyze_function_calls(self, blocks: List[CodeBlock], node: Node):
+    def _analyze_function_calls(self, blocks: list[CodeBlock], node: Node):
         """함수 호출 관계 분석"""
         if node.type == "call":
             self._process_function_call(node, blocks)
@@ -246,7 +261,7 @@ class ASTExtractor:
         for child in node.children:
             self._analyze_function_calls(blocks, child)
 
-    def _process_function_call(self, call_node: Node, blocks: List[CodeBlock]):
+    def _process_function_call(self, call_node: Node, blocks: list[CodeBlock]):
         """개별 함수 호출 처리"""
         call_line = call_node.start_point[0]
         caller_block = self._find_containing_block(call_line, blocks)
@@ -255,11 +270,15 @@ class ASTExtractor:
             return
 
         called_func = self._extract_called_function_name(call_node)
-        if called_func and called_func not in caller_block.dependencies:
+        if (
+            caller_block.dependencies
+            and called_func
+            and called_func not in caller_block.dependencies
+        ):
             caller_block.dependencies.append(called_func)
 
     def _find_containing_block(
-        self, line: int, blocks: List[CodeBlock]
+        self, line: int, blocks: list[CodeBlock]
     ) -> CodeBlock | None:
         """특정 라인을 포함하는 가장 구체적인 블록 찾기"""
         candidates = [b for b in blocks if b.start_line <= line <= b.end_line]
