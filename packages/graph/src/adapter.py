@@ -1,12 +1,16 @@
-"""
-Parser 결과를 Graph 모델로 변환하는 어댑터
-CodeBlock 객체들을 Graph 패키지의 모델로 변환
+"""Parser 결과를 Graph 모델로 변환하는 어댑터
+
+CodeBlock 객체들을 Graph 패키지의 모델로 변환하는 핵심 어댑터입니다.
+Parser 패키지의 변경사항을 Graph 패키지에 반영합니다.
 """
 
+import logging
 from pathlib import Path
 from typing import Any
 
 from .models import CodeGraph, CodeNode, CodeRelation, NodeType, RelationType
+
+logger = logging.getLogger(__name__)
 
 
 class ParserToGraphAdapter:
@@ -186,20 +190,6 @@ class ParserToGraphAdapter:
         )
         return type_mapping.get(block_type_str, NodeType.MODULE)
 
-    def _map_dependency_type(self, dep_type) -> RelationType:
-        """DependencyType을 RelationType으로 매핑"""
-        type_mapping = {
-            "calls": RelationType.CALLS,
-            "inherits": RelationType.INHERITS,
-            "imports": RelationType.IMPORTS,
-            "references": RelationType.REFERENCES,
-            "defines": RelationType.DEFINES,
-            "contains": RelationType.CONTAINS,
-        }
-
-        dep_type_str = dep_type.value if hasattr(dep_type, "value") else str(dep_type)
-        return type_mapping.get(dep_type_str, RelationType.REFERENCES)
-
     def _create_node_from_dict(self, block_data: dict[str, Any]) -> CodeNode:
         """블록 데이터로부터 CodeNode 생성"""
 
@@ -334,7 +324,14 @@ class ParserToGraphAdapter:
         return relations
 
     def _map_dependency_type(self, dep_type: str) -> RelationType:
-        """의존성 타입을 RelationType으로 매핑"""
+        """의존성 타입을 RelationType으로 매핑
+
+        Args:
+            dep_type: 의존성 타입 문자열
+
+        Returns:
+            매핑된 RelationType
+        """
         mapping = {
             "call": RelationType.CALLS,
             "calls": RelationType.CALLS,
@@ -355,8 +352,12 @@ class ParserToGraphAdapter:
         }
         return mapping.get(dep_type.lower(), RelationType.DEPENDS_ON)
 
-    def _update_graph_statistics(self, graph: CodeGraph):
-        """그래프 통계 정보 업데이트"""
+    def _update_graph_statistics(self, graph: CodeGraph) -> None:
+        """그래프 통계 정보 업데이트
+
+        Args:
+            graph: 업데이트할 CodeGraph
+        """
         if graph.nodes:
             # 파일 수 계산
             file_paths = {node.file_path for node in graph.nodes.values()}
@@ -382,4 +383,4 @@ def convert_parser_results_to_graph(
 def create_node_from_dict(node_data: dict[str, Any]) -> CodeNode:
     """편의 함수: 딕셔너리에서 CodeNode 생성"""
     adapter = ParserToGraphAdapter()
-    return adapter._create_node_from_block(node_data)
+    return adapter._create_node_from_dict(node_data)

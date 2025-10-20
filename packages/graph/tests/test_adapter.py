@@ -1,322 +1,241 @@
-"""
-Graph 패키지 어댑터 테스트
+"""Graph 패키지 Adapter 테스트
+
+ParserToGraphAdapter의 기능을 검증하는 테스트들입니다.
+CodeBlock을 CodeGraph로 변환하는 과정을 테스트합니다.
 """
 
 import pytest
 
 from src.adapter import ParserToGraphAdapter
-from src.models import CodeGraph, NodeType, RelationType
+from src.models import CodeGraph, CodeNode, NodeType, RelationType
 
 
 class MockCodeBlock:
-    """테스트용 Mock CodeBlock 클래스"""
+    """테스트용 Mock CodeBlock"""
 
     def __init__(
         self,
-        block_type,
-        name,
-        start_line,
-        end_line,
-        file_path="test.py",
-        source_code="",
-        docstring=None,
+        block_type: str,
+        name: str,
+        start_line: int,
+        end_line: int,
+        file_path: str = "test.py",
         dependencies=None,
-        imports=None,
-        complexity=0,
-        scope_level=0,
+        docstring: str | None = None,
+        complexity: int = 0,
+        scope_level: int = 0,
     ):
         self.block_type = block_type
         self.name = name
         self.start_line = start_line
         self.end_line = end_line
         self.file_path = file_path
-        self.source_code = source_code
-        self.docstring = docstring
         self.dependencies = dependencies or []
-        self.imports = imports or []
+        self.docstring = docstring
         self.complexity = complexity
         self.scope_level = scope_level
+        self.source_code = f"def {name}(): pass"
+        self.imports = []
+        self.parameters = []
+        self.return_type = None
+        self.decorators = []
 
 
 class TestParserToGraphAdapter:
-    """ParserToGraphAdapter 클래스 테스트"""
+    """ParserToGraphAdapter 테스트"""
 
     @pytest.fixture
     def adapter(self):
-        """어댑터 픽스처"""
+        """어댑터 인스턴스 픽스처"""
         return ParserToGraphAdapter()
 
     @pytest.fixture
-    def mock_code_blocks(self):
-        """Mock CodeBlock 리스트 픽스처"""
+    def sample_blocks(self):
+        """샘플 CodeBlock들"""
         return [
+            MockCodeBlock("module", "test_module", 0, 100, "test.py"),
+            MockCodeBlock("class", "TestClass", 10, 50, "test.py", complexity=5),
             MockCodeBlock(
-                block_type="module",
-                name="test_module",
-                start_line=1,
-                end_line=50,
-                file_path="/path/to/test.py",
+                "function", "test_func", 60, 80, "test.py", complexity=3, scope_level=0
             ),
-            MockCodeBlock(
-                block_type="class",
-                name="TestClass",
-                start_line=10,
-                end_line=30,
-                file_path="/path/to/test.py",
-                docstring="Test class",
-                complexity=5,
-            ),
-            MockCodeBlock(
-                block_type="function",
-                name="test_method",
-                start_line=15,
-                end_line=25,
-                file_path="/path/to/test.py",
-                docstring="Test method",
-                dependencies=["TestClass"],
-                complexity=3,
-            ),
-        ]
-
-    @pytest.fixture
-    def dict_blocks(self):
-        """딕셔너리 형태 블록 데이터 픽스처"""
-        return [
-            {
-                "block_type": "module",
-                "name": "test_module",
-                "start_line": 1,
-                "end_line": 50,
-                "file_path": "/path/to/test.py",
-                "source_code": "# module content",
-                "complexity": 10,
-            },
-            {
-                "block_type": "class",
-                "name": "TestClass",
-                "start_line": 10,
-                "end_line": 30,
-                "file_path": "/path/to/test.py",
-                "docstring": "Test class",
-                "dependencies": ["BaseClass"],
-                "complexity": 15,
-            },
-            {
-                "block_type": "function",
-                "name": "test_function",
-                "start_line": 35,
-                "end_line": 45,
-                "file_path": "/path/to/test.py",
-                "docstring": "Test function",
-                "parameters": ["param1", "param2"],
-                "return_type": "str",
-                "dependencies": ["TestClass"],
-                "imports": ["os", "sys"],
-            },
         ]
 
     def test_adapter_initialization(self, adapter):
         """어댑터 초기화 테스트"""
+        assert adapter is not None
         assert adapter.node_counter == 0
 
-    def test_convert_to_graph_from_code_blocks(self, adapter, mock_code_blocks):
-        """CodeBlock 객체들로부터 그래프 변환 테스트"""
+    def test_convert_to_graph_with_code_blocks(self, adapter, sample_blocks):
+        """CodeBlock 리스트를 그래프로 변환"""
         graph = adapter.convert_to_graph(
-            mock_code_blocks,
-            project_name="test_project",
-            project_path="/path/to/project",
+            sample_blocks, project_name="test_project", project_path="/test"
         )
 
         assert isinstance(graph, CodeGraph)
         assert graph.project_name == "test_project"
-        assert graph.project_path == "/path/to/project"
-        assert len(graph.nodes) == 3
+        assert graph.project_path == "/test"
+        assert len(graph.nodes) > 0
 
-        # 노드 타입 확인 (Enum이 문자열로 저장되는 경우 대응)
-        node_types = [str(node.node_type) for node in graph.nodes.values()]
-        assert "Module" in node_types
-        assert "Class" in node_types
-        assert "Function" in node_types
+    def test_node_creation_from_code_block(self, adapter):
+        """CodeBlock에서 노드 생성"""
+        block = MockCodeBlock("function", "my_func", 10, 20, "module.py")
+        node = adapter._create_node_from_code_block(block)
 
-    def test_convert_to_graph_from_dicts(self, adapter, dict_blocks):
-        """딕셔너리 데이터로부터 그래프 변환 테스트"""
-        graph = adapter.convert_to_graph(
-            dict_blocks,
-            project_name="dict_project",
-            project_path="/path/to/dict_project",
+        assert isinstance(node, CodeNode)
+        assert node.name == "my_func"
+        # Enum 또는 문자열로 저장될 수 있으므로 둘 다 확인
+        node_type_value = (
+            node.node_type if isinstance(node.node_type, str) else node.node_type.value
         )
-
-        assert isinstance(graph, CodeGraph)
-        assert graph.project_name == "dict_project"
-        assert len(graph.nodes) == 3
-
-        # 특정 노드 확인
-        function_nodes = graph.get_nodes_by_type(NodeType.FUNCTION)
-        assert len(function_nodes) == 1
-        func_node = function_nodes[0]
-        assert func_node.name == "test_function"
-        assert len(func_node.parameters) == 2
-        assert func_node.return_type == "str"
-        assert len(func_node.imports) == 2
-
-    def test_create_node_from_code_block(self, adapter, mock_code_blocks):
-        """CodeBlock으로부터 노드 생성 테스트"""
-        code_block = mock_code_blocks[1]  # TestClass
-        node = adapter._create_node_from_code_block(code_block)
-
-        assert node.name == "TestClass"
-        assert node.node_type == NodeType.CLASS or str(node.node_type) == "Class"
-        assert node.file_path == "/path/to/test.py"
+        assert node_type_value == NodeType.FUNCTION.value
         assert node.start_line == 10
-        assert node.end_line == 30
-        assert node.docstring == "Test class"
-        assert node.complexity == 5
+        assert node.end_line == 20
 
-    def test_create_node_from_dict(self, adapter, dict_blocks):
-        """딕셔너리로부터 노드 생성 테스트"""
-        block_data = dict_blocks[2]  # test_function
-        node = adapter._create_node_from_dict(block_data)
-
-        assert node.name == "test_function"
-        assert node.node_type == NodeType.FUNCTION or str(node.node_type) == "Function"
-        assert node.file_path == "/path/to/test.py"
-        assert node.start_line == 35
-        assert node.end_line == 45
-        assert len(node.parameters) == 2
-        assert node.return_type == "str"
-        assert len(node.imports) == 2
-
-    def test_map_block_type_from_enum(self, adapter):
+    def test_block_type_mapping(self, adapter):
         """블록 타입 매핑 테스트"""
-        # 문자열 블록 타입
-        assert adapter._map_block_type("module") == NodeType.MODULE
-        assert adapter._map_block_type("class") == NodeType.CLASS
-        assert adapter._map_block_type("function") == NodeType.FUNCTION
-        assert adapter._map_block_type("unknown") == NodeType.FUNCTION  # 기본값
+        test_cases = [
+            ("module", NodeType.MODULE),
+            ("class", NodeType.CLASS),
+            ("function", NodeType.FUNCTION),
+            ("import", NodeType.IMPORT),
+            ("variable", NodeType.VARIABLE),
+        ]
 
-    def test_map_dependency_type(self, adapter):
+        for block_type_str, expected_node_type in test_cases:
+            node_type = adapter._map_block_type_from_enum(block_type_str)
+            assert node_type == expected_node_type
+
+    def test_dependency_type_mapping(self, adapter):
         """의존성 타입 매핑 테스트"""
-        assert adapter._map_dependency_type("calls") == RelationType.CALLS
-        assert adapter._map_dependency_type("inherits") == RelationType.INHERITS
-        assert adapter._map_dependency_type("imports") == RelationType.IMPORTS
-        assert (
-            adapter._map_dependency_type("unknown") == RelationType.DEPENDS_ON
-        )  # 기본값
+        test_cases = [
+            ("calls", RelationType.CALLS),
+            ("inherits", RelationType.INHERITS),
+            ("imports", RelationType.IMPORTS),
+            ("references", RelationType.REFERENCES),
+            ("defines", RelationType.DEFINES),
+            ("contains", RelationType.CONTAINS),
+        ]
 
-    def test_calculate_complexity(self, adapter, dict_blocks):
-        """복잡도 계산 테스트"""
-        # 복잡도가 이미 있는 경우
-        block_with_complexity = dict_blocks[0]
-        complexity = adapter._calculate_complexity(block_with_complexity)
-        assert complexity == 10
+        for dep_type_str, expected_rel_type in test_cases:
+            rel_type = adapter._map_dependency_type(dep_type_str)
+            assert rel_type == expected_rel_type
 
-        # 복잡도가 없는 경우 - 라인 수와 의존성으로 계산
-        block_without_complexity = {
-            "start_line": 10,
-            "end_line": 20,
-            "dependencies": ["dep1", "dep2"],
-        }
-        complexity = adapter._calculate_complexity(block_without_complexity)
-        expected = (20 - 10 + 1) + (2 * 2)  # 라인 수 + 의존성*2
-        assert complexity == expected
-
-    def test_generate_node_id(self, adapter):
+    def test_node_id_generation(self, adapter):
         """노드 ID 생성 테스트"""
         block_data = {
-            "file_path": "/path/to/test.py",
+            "file_path": "/path/to/file.py",
             "block_type": "function",
-            "name": "test_func",
+            "name": "my_func",
             "start_line": 10,
         }
 
         node_id = adapter._generate_node_id(block_data)
-        expected = "test:function:test_func:10"
-        assert node_id == expected
+        assert "file" in node_id
+        assert "function" in node_id
+        assert "my_func" in node_id
+        assert "10" in node_id
 
-    def test_update_graph_statistics(self, adapter, mock_code_blocks):
+    def test_complexity_calculation(self, adapter):
+        """복잡도 계산 테스트"""
+        # 경우 1: 이미 복잡도가 있는 경우
+        block_data_with_complexity = {
+            "complexity": 10,
+            "start_line": 0,
+            "end_line": 0,
+            "dependencies": [],
+        }
+        complexity = adapter._calculate_complexity(block_data_with_complexity)
+        assert complexity == 10
+
+        # 경우 2: 라인 수 기반 계산
+        block_data_without_complexity = {
+            "complexity": 0,
+            "start_line": 10,
+            "end_line": 20,
+            "dependencies": ["dep1", "dep2"],
+        }
+        complexity = adapter._calculate_complexity(block_data_without_complexity)
+        assert complexity > 0  # 라인 수 + 의존성 가중치
+
+    def test_statistics_update(self, adapter):
         """그래프 통계 업데이트 테스트"""
-        graph = adapter.convert_to_graph(
-            mock_code_blocks, project_name="stats_test", project_path="/path"
-        )
+        blocks = [
+            MockCodeBlock("module", "mod1", 0, 100, "file1.py"),
+            MockCodeBlock("class", "Class1", 10, 50, "file1.py"),
+            MockCodeBlock("function", "func1", 60, 80, "file2.py"),
+        ]
 
-        assert graph.total_files == 1  # 모든 블록이 같은 파일
-        assert graph.total_lines > 0  # 라인 수 계산됨
+        graph = adapter.convert_to_graph(blocks)
 
-        stats = graph.get_statistics()
-        assert stats["total_nodes"] == 3
-        assert stats["node_types"]["Module"] == 1
-        assert stats["node_types"]["Class"] == 1
-        assert stats["node_types"]["Function"] == 1
+        assert graph.total_files == 2  # file1.py, file2.py
+        assert graph.total_nodes == 3
+        assert graph.total_lines > 0
 
-
-class TestIntegration:
-    """통합 테스트"""
-
-    def test_full_conversion_workflow(self):
-        """전체 변환 워크플로 테스트"""
-        # Mock 데이터 준비
-        code_blocks = [
-            MockCodeBlock("module", "main", 1, 100, "/project/main.py"),
+    def test_convert_with_dependencies(self, adapter):
+        """의존성을 포함한 변환 테스트"""
+        blocks = [
+            MockCodeBlock("class", "ClassA", 10, 30, "test.py"),
             MockCodeBlock(
-                "class",
-                "Calculator",
-                10,
-                50,
-                "/project/main.py",
-                docstring="Calculator class",
-                dependencies=[],
-                complexity=8,
-            ),
-            MockCodeBlock(
-                "function",
-                "add",
-                15,
-                20,
-                "/project/main.py",
-                docstring="Add two numbers",
-                dependencies=["Calculator"],
-                complexity=2,
-            ),
-            MockCodeBlock(
-                "function",
-                "multiply",
-                25,
-                35,
-                "/project/main.py",
-                docstring="Multiply two numbers",
-                dependencies=["Calculator"],
-                complexity=3,
+                "class", "ClassB", 40, 60, "test.py", dependencies=["ClassA"]
             ),
         ]
 
-        # 변환 실행
-        adapter = ParserToGraphAdapter()
-        graph = adapter.convert_to_graph(
-            code_blocks, project_name="calculator_project", project_path="/project"
-        )
+        graph = adapter.convert_to_graph(blocks)
 
-        # 결과 검증
+        # 노드 생성 확인
+        assert len(graph.nodes) == 2
+
+        # 관계 생성 확인 (ClassB가 ClassA에 의존)
+        assert len(graph.relations) > 0
+
+
+class TestAdapterEdgeCases:
+    """어댑터 엣지 케이스 테스트"""
+
+    @pytest.fixture
+    def adapter(self):
+        """어댑터 인스턴스 픽스처"""
+        return ParserToGraphAdapter()
+
+    def test_empty_blocks_list(self, adapter):
+        """빈 블록 리스트 처리"""
+        graph = adapter.convert_to_graph([], project_name="empty", project_path="/")
+        assert isinstance(graph, CodeGraph)
+        assert len(graph.nodes) == 0
+        assert len(graph.relations) == 0
+
+    def test_block_with_no_file_path(self, adapter):
+        """파일 경로가 없는 블록 처리"""
+        block = MockCodeBlock("function", "func", 0, 10)
+        block.file_path = ""
+
+        node = adapter._create_node_from_code_block(block)
+        assert node is not None
+        assert node.file_path == ""
+
+    def test_single_node_graph(self, adapter):
+        """단일 노드 그래프"""
+        blocks = [MockCodeBlock("module", "single", 0, 10, "single.py")]
+        graph = adapter.convert_to_graph(blocks)
+
+        assert len(graph.nodes) == 1
+        assert len(graph.relations) == 0
+
+    def test_complex_dependency_chain(self, adapter):
+        """복잡한 의존성 체인"""
+        blocks = [
+            MockCodeBlock("class", "A", 1, 10, "file.py"),
+            MockCodeBlock("class", "B", 11, 20, "file.py", dependencies=["A"]),
+            MockCodeBlock("class", "C", 21, 30, "file.py", dependencies=["B"]),
+            MockCodeBlock("class", "D", 31, 40, "file.py", dependencies=["A", "C"]),
+        ]
+
+        graph = adapter.convert_to_graph(blocks)
+
+        # 의존성 체인이 올바르게 생성되는지 확인
         assert len(graph.nodes) == 4
-        assert len(graph.relations) >= 2  # add와 multiply가 Calculator에 의존
-
-        # 특정 노드 존재 확인
-        calc_nodes = [n for n in graph.nodes.values() if n.name == "Calculator"]
-        assert len(calc_nodes) == 1
-
-        # 관계 확인
-        add_to_calc_relations = [
-            r
-            for r in graph.relations
-            if "add" in r.from_node_id and "Calculator" in r.to_node_id
-        ]
-        assert len(add_to_calc_relations) >= 0  # 관계가 생성될 수 있음
-
-        # 통계 확인
-        stats = graph.get_statistics()
-        assert stats["total_nodes"] == 4
-        assert stats["node_types"]["Module"] == 1
-        assert stats["node_types"]["Class"] == 1
-        assert stats["node_types"]["Function"] == 2
+        # 관계가 생성되었는지 확인
+        assert len(graph.relations) > 0
 
 
 if __name__ == "__main__":

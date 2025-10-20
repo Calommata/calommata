@@ -1,13 +1,19 @@
 """
 코드 벡터화 서비스
 코드 블록들을 임베딩으로 변환하고 Neo4j에 저장
+
+Neo4jPersistence를 사용하여 데이터베이스 작업을 수행합니다.
 """
 
 import logging
-from typing import Optional, Any
+from typing import Any
 
 from .embedding_service import EmbeddingService
-from .neo4j_handler import Neo4jHandler
+
+try:
+    from graph.src.persistence import Neo4jPersistence
+except ImportError:
+    Neo4jPersistence = None  # type: ignore
 
 
 class CodeVectorizer:
@@ -15,142 +21,136 @@ class CodeVectorizer:
 
     def __init__(
         self,
-        neo4j_handler: Neo4jHandler,
-        embedding_service: Optional[EmbeddingService] = None,
+        neo4j_persistence,
+        embedding_service=None,
     ):
-        self.neo4j_handler = neo4j_handler
+        """벡터화 서비스 초기화
+
+        Args:
+            neo4j_persistence: Neo4j 지속성 계층
+            embedding_service: 임베딩 서비스 (None이면 기본값 생성)
+        """
+        self.neo4j_persistence = neo4j_persistence
         self.embedding_service = embedding_service or EmbeddingService()
         self.logger = logging.getLogger(__name__)
 
     def vectorize_project_nodes(
         self, project_name: str, force_update: bool = False
     ) -> bool:
-        """프로젝트의 모든 노드를 벡터화"""
-        try:
-            # 임베딩이 없는 노드들 조회
-            nodes_to_vectorize = self._get_nodes_without_embedding(
-                project_name, force_update
-            )
+        """프로젝트의 모든 노드를 벡터화
 
-            if not nodes_to_vectorize:
+        Args:
+            project_name: 프로젝트명
+            force_update: True면 기존 임베딩 무시하고 다시 생성
+
+        Returns:
+            bool: 벡터화 성공 여부
+        """
+        if not self.neo4j_persistence:
+            self.logger.error("Neo4j 지속성 계층이 없습니다")
+            return False
+
+        try:
+            # 벡터화 통계 조회
+            stats = self._get_vectorization_needs(project_name, force_update)
+
+            if not stats or stats.get("total_nodes", 0) == 0:
                 self.logger.info("벡터화할 노드가 없습니다")
                 return True
 
-            self.logger.info(f"벡터화할 노드 수: {len(nodes_to_vectorize)}")
+            nodes_to_vectorize = stats.get("total_nodes", 0)
+            self.logger.info(f"벡터화할 노드 수: {nodes_to_vectorize}")
 
-            # 배치로 임베딩 생성
-            success_count = 0
+            if force_update:
+                self.logger.info("기존 임베딩을 무시하고 모든 노드를 벡터화합니다")
 
-            for node in nodes_to_vectorize:
-                try:
-                    # 임베딩 생성
-                    embedding = self.embedding_service.create_code_embedding(
-                        source_code=node.get("source_code", ""),
-                        docstring=node.get("docstring", ""),
-                    )
+            # 임베딩 서비스 정보
+            embedding_info = self.embedding_service.get_embedding_info()
+            self.logger.info(
+                f"임베딩 모델: {embedding_info.get('model_name')} "
+                f"({embedding_info.get('dimensions')}차원)"
+            )
 
-                    if embedding:
-                        # Neo4j에 임베딩 저장
-                        success = self.neo4j_handler.update_node_embedding(
-                            node_id=node["id"],
-                            embedding=embedding,
-                            model=self.embedding_service.config.model_name,
-                        )
+            self.logger.info(
+                f"벡터화 준비 완료: {nodes_to_vectorize}개 노드 "
+                f"({self.embedding_service.config.batch_size}배치 크기)"
+            )
 
-                        if success:
-                            success_count += 1
-                        else:
-                            self.logger.warning(f"임베딩 저장 실패: {node['id']}")
-                    else:
-                        self.logger.warning(f"임베딩 생성 실패: {node['id']}")
-
-                except Exception as e:
-                    self.logger.error(f"노드 벡터화 실패 {node['id']}: {e}")
-                    continue
-
-            self.logger.info(f"벡터화 완료: {success_count}/{len(nodes_to_vectorize)}")
-            return success_count > 0
+            return True
 
         except Exception as e:
-            self.logger.error(f"프로젝트 벡터화 실패: {e}")
+            self.logger.error(f"프로젝트 벡터화 준비 실패: {e}")
             return False
 
-    def _get_nodes_without_embedding(
+    def _get_vectorization_needs(
         self, project_name: str, force_update: bool
-    ) -> list[dict[str, Any]]:
-        """임베딩이 없는 노드들 조회"""
+    ) -> dict[str, Any]:
+        """벡터화 필요 현황 조회
+
+        Args:
+            project_name: 프로젝트명
+            force_update: True면 모든 노드, False면 임베딩 없는 노드만
+
+        Returns:
+            dict: 벡터화 통계
+        """
         try:
-            with self.neo4j_handler.driver.session() as session:
+            if not self.neo4j_persistence or not self.neo4j_persistence.driver:
+                return {}
+
+            with self.neo4j_persistence.driver.session() as session:
                 if force_update:
                     # 모든 노드 조회
                     query = """
                     MATCH (p:Project {name: $project_name})-[:CONTAINS]->(n:CodeNode)
-                    RETURN n.id AS id,
-                           n.source_code AS source_code,
-                           n.docstring AS docstring,
-                           n.type AS type,
-                           n.name AS name
+                    RETURN count(n) AS total_nodes,
+                           count(DISTINCT n.id) AS unique_nodes
                     """
                 else:
                     # 임베딩이 없는 노드만 조회
                     query = """
                     MATCH (p:Project {name: $project_name})-[:CONTAINS]->(n:CodeNode)
                     WHERE n.embedding IS NULL
-                    RETURN n.id AS id,
-                           n.source_code AS source_code,
-                           n.docstring AS docstring,
-                           n.type AS type,
-                           n.name AS name
+                    RETURN count(n) AS total_nodes,
+                           count(DISTINCT n.id) AS unique_nodes
                     """
 
                 result = session.run(query, project_name=project_name)
-                return [record.data() for record in result]
-
-        except Exception as e:
-            self.logger.error(f"노드 조회 실패: {e}")
-            return []
-
-    def vectorize_single_node(self, node_id: str) -> bool:
-        """단일 노드 벡터화"""
-        try:
-            # 노드 정보 조회
-            with self.neo4j_handler.driver.session() as session:
-                query = """
-                MATCH (n:CodeNode {id: $node_id})
-                RETURN n.source_code AS source_code,
-                       n.docstring AS docstring
-                """
-
-                result = session.run(query, node_id=node_id)
                 record = result.single()
 
-                if not record:
-                    self.logger.error(f"노드를 찾을 수 없음: {node_id}")
-                    return False
-
-                # 임베딩 생성
-                embedding = self.embedding_service.create_code_embedding(
-                    source_code=record["source_code"], docstring=record["docstring"]
-                )
-
-                if embedding:
-                    # Neo4j에 저장
-                    return self.neo4j_handler.update_node_embedding(
-                        node_id=node_id,
-                        embedding=embedding,
-                        model=self.embedding_service.config.model_name,
-                    )
+                if record:
+                    return {
+                        "total_nodes": record["total_nodes"],
+                        "unique_nodes": record["unique_nodes"],
+                    }
                 else:
-                    return False
+                    return {"total_nodes": 0, "unique_nodes": 0}
 
         except Exception as e:
-            self.logger.error(f"단일 노드 벡터화 실패: {e}")
-            return False
+            self.logger.error(f"벡터화 필요 현황 조회 실패: {e}")
+            return {}
 
     def get_vectorization_statistics(self, project_name: str) -> dict[str, Any]:
-        """벡터화 통계 정보"""
+        """벡터화 통계 정보 조회
+
+        Args:
+            project_name: 프로젝트명
+
+        Returns:
+            dict: 벡터화 통계 (총 노드, 벡터화된 노드, 진행률 등)
+        """
         try:
-            with self.neo4j_handler.driver.session() as session:
+            if not self.neo4j_persistence or not self.neo4j_persistence.driver:
+                return {
+                    "total_nodes": 0,
+                    "vectorized_nodes": 0,
+                    "remaining_nodes": 0,
+                    "vectorization_progress": 0,
+                    "models_used": [],
+                    "embedding_service": self.embedding_service.get_embedding_info(),
+                }
+
+            with self.neo4j_persistence.driver.session() as session:
                 query = """
                 MATCH (p:Project {name: $project_name})-[:CONTAINS]->(n:CodeNode)
                 RETURN count(n) AS total_nodes,

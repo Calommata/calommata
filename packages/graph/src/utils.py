@@ -1,31 +1,55 @@
-"""
-Graph 패키지 유틸리티 함수들
-그래프 조작, 검증, 시각화 등의 편의 기능
+"""Graph 패키지 유틸리티 함수들
+
+그래프 조작, 검증, 시각화 등의 편의 기능을 제공합니다.
+- GraphValidator: 그래프 유효성 검증
+- GraphExporter: JSON, DOT 형식으로 내보내기
+- GraphAnalyzer: 그래프 분석 (순환 의존성, 복잡도 등)
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 from .models import CodeGraph, NodeType, RelationType
 
+logger = logging.getLogger(__name__)
+
 
 class GraphValidator:
-    """그래프 유효성 검증 클래스"""
+    """그래프 유효성 검증 클래스
 
-    def __init__(self, graph: CodeGraph):
+    그래프의 노드, 관계, 일관성을 검증하고
+    오류 및 경고를 리포트합니다.
+    """
+
+    def __init__(self, graph: CodeGraph) -> None:
+        """초기화
+
+        Args:
+            graph: 검증할 CodeGraph
+        """
         self.graph = graph
         self.errors: list[str] = []
         self.warnings: list[str] = []
+        logger.debug(f"GraphValidator initialized for graph: {graph.project_name}")
 
     def validate(self) -> dict[str, Any]:
-        """전체 그래프 유효성 검증"""
+        """전체 그래프 유효성 검증
+
+        Returns:
+            검증 결과 딕셔너리
+        """
         self.errors.clear()
         self.warnings.clear()
 
         self._validate_nodes()
         self._validate_relations()
         self._validate_consistency()
+
+        logger.info(
+            f"Validation complete: {len(self.errors)} errors, {len(self.warnings)} warnings"
+        )
 
         return {
             "is_valid": len(self.errors) == 0,
@@ -34,7 +58,7 @@ class GraphValidator:
             "statistics": self._get_validation_statistics(),
         }
 
-    def _validate_nodes(self):
+    def _validate_nodes(self) -> None:
         """노드 유효성 검증"""
         node_ids = set()
 
@@ -61,7 +85,7 @@ class GraphValidator:
             if node.start_line < 0 or node.end_line < 0:
                 self.warnings.append(f"음수 라인 번호: {node.id}")
 
-    def _validate_relations(self):
+    def _validate_relations(self) -> None:
         """관계 유효성 검증"""
         for i, relation in enumerate(self.graph.relations):
             # 노드 존재 확인
@@ -85,7 +109,7 @@ class GraphValidator:
             if relation.weight < 0:
                 self.warnings.append(f"관계 {i}: 음수 가중치 - {relation.weight}")
 
-    def _validate_consistency(self):
+    def _validate_consistency(self) -> None:
         """일관성 검증"""
         # 프로젝트 통계와 실제 데이터 비교
         actual_files = len({node.file_path for node in self.graph.nodes.values()})
@@ -123,13 +147,29 @@ class GraphValidator:
 
 
 class GraphExporter:
-    """그래프 내보내기 클래스"""
+    """그래프 내보내기 클래스
 
-    def __init__(self, graph: CodeGraph):
+    그래프를 JSON, DOT 등 다양한 형식으로 내보냅니다.
+    """
+
+    def __init__(self, graph: CodeGraph) -> None:
+        """초기화
+
+        Args:
+            graph: 내보낼 CodeGraph
+        """
         self.graph = graph
+        logger.debug(f"GraphExporter initialized for graph: {graph.project_name}")
 
     def to_json(self, indent: int = 2) -> str:
-        """JSON 형식으로 내보내기"""
+        """JSON 형식으로 내보내기
+
+        Args:
+            indent: JSON 들여쓰기 크기
+
+        Returns:
+            JSON 문자열
+        """
         data = {
             "project": {
                 "name": self.graph.project_name,
@@ -144,7 +184,9 @@ class GraphExporter:
                 {
                     "id": node.id,
                     "name": node.name,
-                    "type": node.node_type.value,
+                    "type": node.node_type
+                    if isinstance(node.node_type, str)
+                    else node.node_type.value,
                     "file_path": node.file_path,
                     "start_line": node.start_line,
                     "end_line": node.end_line,
@@ -172,7 +214,9 @@ class GraphExporter:
                 {
                     "from": rel.from_node_id,
                     "to": rel.to_node_id,
-                    "type": rel.relation_type.value,
+                    "type": rel.relation_type
+                    if isinstance(rel.relation_type, str)
+                    else rel.relation_type.value,
                     "weight": rel.weight,
                     "line_number": rel.line_number,
                     "context": rel.context,
@@ -212,7 +256,12 @@ class GraphExporter:
         # 노드 정의
         for node in self.graph.nodes.values():
             color = type_colors.get(node.node_type, "white")
-            label = f"{node.name}\\n({node.node_type.value})"
+            node_type_value = (
+                node.node_type
+                if isinstance(node.node_type, str)
+                else node.node_type.value
+            )
+            label = f"{node.name}\\n({node_type_value})"
             lines.append(f'  "{node.id}" [label="{label}", fillcolor="{color}"];')
 
         lines.append("")
@@ -220,9 +269,14 @@ class GraphExporter:
         # 관계 정의
         for rel in self.graph.relations:
             if not rel.to_node_id.startswith("external:"):
+                rel_type_value = (
+                    rel.relation_type
+                    if isinstance(rel.relation_type, str)
+                    else rel.relation_type.value
+                )
                 lines.append(
                     f'  "{rel.from_node_id}" -> "{rel.to_node_id}" '
-                    f'[label="{rel.relation_type.value}"];'
+                    f'[label="{rel_type_value}"];'
                 )
 
         lines.append("}")
@@ -235,10 +289,19 @@ class GraphExporter:
 
 
 class GraphAnalyzer:
-    """그래프 분석 유틸리티"""
+    """그래프 분석 유틸리티
 
-    def __init__(self, graph: CodeGraph):
+    순환 의존성, 복잡도, 연결성 등을 분석합니다.
+    """
+
+    def __init__(self, graph: CodeGraph) -> None:
+        """초기화
+
+        Args:
+            graph: 분석할 CodeGraph
+        """
         self.graph = graph
+        logger.debug(f"GraphAnalyzer initialized for graph: {graph.project_name}")
 
     def find_circular_dependencies(self) -> list[list[str]]:
         """순환 의존성 탐지"""
@@ -318,7 +381,9 @@ class GraphAnalyzer:
             {
                 "node_id": node_id,
                 "name": data["node"].name,
-                "type": data["node"].node_type.value,
+                "type": data["node"].node_type
+                if isinstance(data["node"].node_type, str)
+                else data["node"].node_type.value,
                 "file_path": data["node"].file_path,
                 "incoming_connections": data["incoming"],
                 "outgoing_connections": data["outgoing"],

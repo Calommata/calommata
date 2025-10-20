@@ -17,7 +17,7 @@ try:
     from packages.parser.src.code_analyzer import CodeAnalyzer
     from graph.src.adapter import ParserToGraphAdapter
     from graph.src.models import CodeGraph
-    from src.neo4j_handler import Neo4jHandler
+    from graph.src.persistence import Neo4jPersistence
     from src.embedding_service import EmbeddingService
     from src.code_vectorizer import CodeVectorizer
     from src.graph_rag import GraphRAGService, RAGConfig
@@ -30,7 +30,7 @@ except ImportError as e:
 class CodeAnalysisOrchestrator:
     """코드 분석 전체 파이프라인 오케스트레이터"""
 
-    def __init__(self, project_path: str, project_name: str = None):
+    def __init__(self, project_path: str, project_name: str | None = None):
         self.project_path = Path(project_path)
         self.project_name = project_name or self.project_path.name
 
@@ -42,7 +42,7 @@ class CodeAnalysisOrchestrator:
         self.logger = logging.getLogger(__name__)
 
         # 서비스 초기화
-        self.neo4j_handler = None
+        self.neo4j_persistence: Neo4jPersistence | None = None
         self.embedding_service = None
         self.code_vectorizer = None
         self.graph_rag_service = None
@@ -52,21 +52,21 @@ class CodeAnalysisOrchestrator:
     def _init_services(self):
         """서비스 초기화"""
         try:
-            # Neo4j 핸들러
-            self.neo4j_handler = Neo4jHandler()
+            # Neo4j 지속성 계층
+            self.neo4j_persistence = Neo4jPersistence()
 
             # 임베딩 서비스
             self.embedding_service = EmbeddingService()
 
             # 코드 벡터화 서비스
             self.code_vectorizer = CodeVectorizer(
-                neo4j_handler=self.neo4j_handler,
+                neo4j_persistence=self.neo4j_persistence,
                 embedding_service=self.embedding_service,
             )
 
             # GraphRAG 서비스
             self.graph_rag_service = GraphRAGService(
-                neo4j_handler=self.neo4j_handler,
+                neo4j_persistence=self.neo4j_persistence,
                 embedding_service=self.embedding_service,
                 config=RAGConfig(
                     max_results=10, similarity_threshold=0.7, context_depth=2
@@ -95,7 +95,7 @@ class CodeAnalysisOrchestrator:
 
             # 3. 기존 데이터 삭제 (force_update인 경우)
             if force_update:
-                self.neo4j_handler.clear_project_data(self.project_name)
+                self.neo4j_persistence.clear_project_data(self.project_name)
 
             # 4. Neo4j에 그래프 데이터 저장
             if not self._save_to_neo4j(code_graph):
@@ -115,19 +115,19 @@ class CodeAnalysisOrchestrator:
             self.logger.error(f"분석 파이프라인 실패: {e}")
             return False
         finally:
-            if self.neo4j_handler:
-                self.neo4j_handler.close()
+            if self.neo4j_persistence:
+                self.neo4j_persistence.close()
 
     def _setup_neo4j(self) -> bool:
         """Neo4j 설정 및 연결"""
         try:
             # 연결
-            if not self.neo4j_handler.connect():
+            if not self.neo4j_persistence.connect():
                 self.logger.error("Neo4j 연결 실패")
                 return False
 
             # 제약 조건 및 인덱스 생성
-            self.neo4j_handler.create_constraints_and_indexes()
+            self.neo4j_persistence.create_constraints_and_indexes()
 
             return True
 
@@ -168,20 +168,10 @@ class CodeAnalysisOrchestrator:
     def _save_to_neo4j(self, code_graph: CodeGraph) -> bool:
         """Neo4j에 그래프 데이터 저장"""
         try:
-            # 프로젝트 정보 저장
-            neo4j_format = code_graph.to_neo4j_format()
-
-            if not self.neo4j_handler.save_project(neo4j_format["project"]):
-                return False
-
-            # 노드 저장
-            if not self.neo4j_handler.save_code_nodes(
-                neo4j_format["nodes"], self.project_name
+            # Neo4j Persistence를 사용하여 전체 그래프 저장
+            if not self.neo4j_persistence.save_code_graph(
+                code_graph, project_name=self.project_name
             ):
-                return False
-
-            # 관계 저장
-            if not self.neo4j_handler.save_code_relations(neo4j_format["relations"]):
                 return False
 
             self.logger.info("Neo4j 그래프 저장 완료")
@@ -215,7 +205,7 @@ class CodeAnalysisOrchestrator:
         """결과 출력"""
         try:
             # 데이터베이스 통계
-            stats = self.neo4j_handler.get_database_statistics()
+            stats = self.neo4j_persistence.get_database_statistics()
 
             print("\n" + "=" * 50)
             print("📊 코드 분석 및 GraphRAG 처리 완료")
@@ -264,8 +254,8 @@ class CodeAnalysisOrchestrator:
                 return {"error": "GraphRAG 서비스가 초기화되지 않았습니다"}
 
             # Neo4j 연결 확인
-            if not self.neo4j_handler.driver:
-                self.neo4j_handler.connect()
+            if not self.neo4j_persistence.driver:
+                self.neo4j_persistence.connect()
 
             results = self.graph_rag_service.get_enriched_context(
                 query=query, project_name=self.project_name

@@ -1,15 +1,19 @@
-"""
-코드 분석을 위한 그래프 데이터 구조
+"""코드 분석을 위한 그래프 데이터 구조
+
 Neo4j 통합을 위한 노드와 관계 모델 정의
+Pydantic v2 기반 데이터 검증 및 직렬화
 """
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+logger = logging.getLogger(__name__)
 
 
 class NodeType(Enum):
@@ -100,7 +104,14 @@ class CodeNode(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
     def get_full_name(self) -> str:
-        """노드의 전체 이름 반환 (file_path:type:name)"""
+        """노드의 전체 이름 반환 (file_path:type:name)
+
+        Returns:
+            전체 경로를 포함한 노드 이름
+
+        Example:
+            /path/to/file.py:Function:my_func
+        """
         node_type_str = (
             self.node_type.value
             if hasattr(self.node_type, "value")
@@ -109,9 +120,20 @@ class CodeNode(BaseModel):
         return f"{self.file_path}:{node_type_str}:{self.name}"
 
     def add_dependency(
-        self, target: str, dep_type: str, line_number: int = None, context: str = None
-    ):
-        """의존성 추가"""
+        self,
+        target: str,
+        dep_type: str,
+        line_number: int | None = None,
+        context: str | None = None,
+    ) -> None:
+        """의존성 추가
+
+        Args:
+            target: 의존 대상 이름
+            dep_type: 의존성 타입
+            line_number: 의존성 발생 라인 (선택사항)
+            context: 의존성 컨텍스트 (선택사항)
+        """
         dependency = Dependency(
             target=target,
             dependency_type=dep_type,
@@ -207,6 +229,11 @@ class CodeGraph(BaseModel):
     # 타임스탬프
     created_at: datetime = Field(default_factory=datetime.now, description="생성 시간")
     updated_at: datetime = Field(default_factory=datetime.now, description="수정 시간")
+
+    @property
+    def total_nodes(self) -> int:
+        """총 노드 수"""
+        return len(self.nodes)
 
     def add_node(self, node: CodeNode) -> None:
         """노드 추가"""

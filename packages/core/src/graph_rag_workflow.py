@@ -4,7 +4,7 @@ LangGraph 기반 GraphRAG 워크플로우
 """
 
 import logging
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, TypedDict
 from enum import Enum
 from dataclasses import dataclass
 
@@ -14,7 +14,12 @@ from langchain_core.messages import BaseMessage
 
 from .llm_manager import LLMManager, TaskType
 from .embedding_service import EmbeddingService
-from .neo4j_handler import Neo4jHandler
+
+# Neo4jPersistence import with fallback
+try:
+    from graph.src.persistence import Neo4jPersistence
+except ImportError:
+    Neo4jPersistence = None
 
 logger = logging.getLogger(__name__)
 
@@ -50,21 +55,21 @@ class RAGState(TypedDict):
     workflow_type: str
 
     # 검색 결과
-    search_results: List[Dict[str, Any]]
-    embeddings: List[List[float]]
+    search_results: list[dict[str, Any]]
+    embeddings: list[list[float]]
 
     # 컨텍스트
-    context_nodes: List[Dict[str, Any]]
-    relationships: List[Dict[str, Any]]
+    context_nodes: list[dict[str, Any]]
+    relationships: list[dict[str, Any]]
 
     # LLM 처리
-    messages: List[BaseMessage]
-    analysis_result: Optional[str]
+    messages: list[BaseMessage]
+    analysis_result: str | None
 
     # 메타데이터
-    step_history: List[str]
+    step_history: list[str]
     confidence_score: float
-    error_messages: List[str]
+    error_messages: list[str]
 
 
 class GraphRAGWorkflow:
@@ -72,12 +77,20 @@ class GraphRAGWorkflow:
 
     def __init__(
         self,
-        neo4j_handler: Neo4jHandler,
+        neo4j_persistence,
         embedding_service: EmbeddingService,
-        llm_manager: LLMManager,
-        config: Optional[RAGConfig] = None,
+        llm_manager: LLMManager | None = None,
+        config: "RAGConfig | None" = None,
     ):
-        self.neo4j_handler = neo4j_handler
+        """GraphRAG 워크플로우 초기화
+
+        Args:
+            neo4j_persistence: Neo4j 영속성 계층
+            embedding_service: 임베딩 서비스
+            llm_manager: LLM 관리자 (선택사항)
+            config: RAG 설정 (선택사항)
+        """
+        self.neo4j_persistence = neo4j_persistence
         self.embedding_service = embedding_service
         self.llm_manager = llm_manager
         self.config = config or RAGConfig()
@@ -86,30 +99,36 @@ class GraphRAGWorkflow:
         # 워크플로우 그래프 초기화
         self.workflows = self._build_workflows()
 
-    def _build_workflows(self) -> Dict[RAGWorkflowType, CompiledStateGraph]:
-        """다양한 RAG 워크플로우 구축"""
+    def _build_workflows(self) -> dict[str, CompiledStateGraph]:
+        """다양한 RAG 워크플로우 구축
+
+        Returns:
+            dict: 워크플로우 타입별 컴파일된 상태 그래프
+        """
         workflows = {}
 
         # 1. 단순 검색 워크플로우
-        workflows[RAGWorkflowType.SIMPLE_SEARCH] = self._build_simple_search_workflow()
+        workflows[RAGWorkflowType.SIMPLE_SEARCH.value] = (
+            self._build_simple_search_workflow()
+        )
 
         # 2. 컨텍스트 분석 워크플로우
-        workflows[RAGWorkflowType.CONTEXTUAL_ANALYSIS] = (
+        workflows[RAGWorkflowType.CONTEXTUAL_ANALYSIS.value] = (
             self._build_contextual_analysis_workflow()
         )
 
         # 3. 아키텍처 리뷰 워크플로우
-        workflows[RAGWorkflowType.ARCHITECTURE_REVIEW] = (
+        workflows[RAGWorkflowType.ARCHITECTURE_REVIEW.value] = (
             self._build_architecture_review_workflow()
         )
 
         # 4. 코드 유사성 분석 워크플로우
-        workflows[RAGWorkflowType.CODE_SIMILARITY] = (
+        workflows[RAGWorkflowType.CODE_SIMILARITY.value] = (
             self._build_code_similarity_workflow()
         )
 
         # 5. 리팩토링 제안 워크플로우
-        workflows[RAGWorkflowType.REFACTORING_SUGGESTIONS] = (
+        workflows[RAGWorkflowType.REFACTORING_SUGGESTIONS.value] = (
             self._build_refactoring_workflow()
         )
 
@@ -299,7 +318,7 @@ class GraphRAGWorkflow:
     async def _analyze_with_llm(self, state: RAGState) -> RAGState:
         """LLM을 사용한 분석"""
         try:
-            if not self.llm_manager.is_available():
+            if not self.llm_manager or not self.llm_manager.is_available():
                 state["error_messages"].append("LLM을 사용할 수 없습니다")
                 return state
 
@@ -474,8 +493,16 @@ class GraphRAGWorkflow:
         self,
         query: str,
         workflow_type: RAGWorkflowType = RAGWorkflowType.CONTEXTUAL_ANALYSIS,
-    ) -> Dict[str, Any]:
-        """워크플로우 실행"""
+    ) -> dict[str, Any]:
+        """워크플로우 실행
+
+        Args:
+            query: 입력 쿼리
+            workflow_type: 워크플로우 타입
+
+        Returns:
+            dict: 워크플로우 실행 결과
+        """
         try:
             # 초기 상태 설정
             initial_state: RAGState = {
@@ -493,7 +520,7 @@ class GraphRAGWorkflow:
             }
 
             # 워크플로우 선택 및 실행
-            workflow = self.workflows.get(workflow_type)
+            workflow = self.workflows.get(workflow_type.value)
             if not workflow:
                 return {
                     "success": False,
@@ -519,6 +546,10 @@ class GraphRAGWorkflow:
             self.logger.error(f"워크플로우 실행 실패: {e}")
             return {"success": False, "error": str(e), "result": None}
 
-    def get_available_workflows(self) -> List[str]:
-        """사용 가능한 워크플로우 목록"""
+    def get_available_workflows(self) -> list[str]:
+        """사용 가능한 워크플로우 목록
+
+        Returns:
+            list: 워크플로우 타입 목록
+        """
         return [workflow.value for workflow in RAGWorkflowType]

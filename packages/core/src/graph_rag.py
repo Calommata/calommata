@@ -4,10 +4,9 @@ LangChain/LangGraph 기반 GraphRAG 서비스
 """
 
 import logging
-from typing import Any, Optional
 from dataclasses import dataclass
+from typing import Any
 
-from .neo4j_handler import Neo4jHandler
 from .embedding_service import EmbeddingService
 from .llm_manager import LLMManager, LLMConfig, TaskType
 from .graph_rag_workflow import (
@@ -15,6 +14,11 @@ from .graph_rag_workflow import (
     RAGWorkflowType,
     RAGConfig as WorkflowRAGConfig,
 )
+
+try:
+    from graph.src.persistence import Neo4jPersistence
+except ImportError:
+    Neo4jPersistence = None  # type: ignore
 
 
 @dataclass
@@ -35,12 +39,20 @@ class GraphRAGService:
 
     def __init__(
         self,
-        neo4j_handler: Neo4jHandler,
+        neo4j_persistence,
         embedding_service: EmbeddingService,
-        llm_manager: Optional[LLMManager] = None,
-        config: Optional[RAGConfig] = None,
+        llm_manager: LLMManager | None = None,
+        config: "RAGConfig | None" = None,
     ):
-        self.neo4j_handler = neo4j_handler
+        """GraphRAG 서비스 초기화
+
+        Args:
+            neo4j_persistence: Neo4j 지속성 계층
+            embedding_service: 임베딩 서비스
+            llm_manager: LLM 매니저 (선택사항)
+            config: RAG 설정 (선택사항)
+        """
+        self.neo4j_persistence = neo4j_persistence
         self.embedding_service = embedding_service
         self.config = config or RAGConfig()
         self.logger = logging.getLogger(__name__)
@@ -53,17 +65,25 @@ class GraphRAGService:
         if self.config.enable_workflows and self.llm_manager:
             self.workflow_engine = self._init_workflow_engine()
 
-    def _init_default_llm_manager(self) -> Optional[LLMManager]:
-        """기본 LLM 매니저 초기화"""
+    def _init_default_llm_manager(self) -> LLMManager | None:
+        """기본 LLM 매니저 초기화
+
+        Returns:
+            LLMManager | None: 초기화된 LLM 매니저 또는 None
+        """
         try:
             llm_config = LLMConfig(temperature=0.1, max_tokens=4000)
             return LLMManager(llm_config)
         except Exception as e:
-            self.logger.warning(f"LLM 매니저 초기화 실패: {e}")
+            self.logger.warning(f"❌ LLM 매니저 초기화 실패: {e}")
             return None
 
-    def _init_workflow_engine(self) -> Optional[GraphRAGWorkflow]:
-        """워크플로우 엔진 초기화"""
+    def _init_workflow_engine(self) -> GraphRAGWorkflow | None:
+        """워크플로우 엔진 초기화
+
+        Returns:
+            GraphRAGWorkflow | None: 초기화된 워크플로우 엔진 또는 None
+        """
         try:
             workflow_config = WorkflowRAGConfig(
                 max_results=self.config.max_results,
@@ -74,14 +94,14 @@ class GraphRAGService:
             )
 
             return GraphRAGWorkflow(
-                neo4j_handler=self.neo4j_handler,
+                neo4j_persistence=self.neo4j_persistence,
                 embedding_service=self.embedding_service,
                 llm_manager=self.llm_manager,
                 config=workflow_config,
             )
 
         except Exception as e:
-            self.logger.error(f"워크플로우 엔진 초기화 실패: {e}")
+            self.logger.error(f"❌ 워크플로우 엔진 초기화 실패: {e}")
             return None
 
     async def search_similar_code(
@@ -90,16 +110,32 @@ class GraphRAGService:
         workflow_type: RAGWorkflowType = RAGWorkflowType.SIMPLE_SEARCH,
         **kwargs,
     ) -> dict[str, Any]:
-        """유사한 코드 검색"""
+        """유사한 코드 검색
+
+        Args:
+            query: 검색 쿼리
+            workflow_type: 워크플로우 타입
+
+        Returns:
+            dict: 검색 결과
+        """
         if self.workflow_engine:
             return await self.workflow_engine.execute_workflow(query, workflow_type)
         else:
             return await self._basic_search(query, **kwargs)
 
     async def analyze_code_architecture(
-        self, query: str, project_name: str = None
+        self, query: str, project_name: str | None = None
     ) -> dict[str, Any]:
-        """코드 아키텍처 분석"""
+        """코드 아키텍처 분석
+
+        Args:
+            query: 분석 쿼리
+            project_name: 프로젝트명 (선택사항)
+
+        Returns:
+            dict: 분석 결과
+        """
         if self.workflow_engine:
             enhanced_query = (
                 f"Analyze architecture of project {project_name}: {query}"
@@ -115,7 +151,15 @@ class GraphRAGService:
     async def find_code_similarities(
         self, code_snippet: str, analysis_focus: str = "patterns"
     ) -> dict[str, Any]:
-        """코드 유사성 분석"""
+        """코드 유사성 분석
+
+        Args:
+            code_snippet: 코드 스니펫
+            analysis_focus: 분석 포커스
+
+        Returns:
+            dict: 유사성 분석 결과
+        """
         if self.workflow_engine:
             query = f"Find similar code patterns for: {code_snippet}"
             return await self.workflow_engine.execute_workflow(
@@ -129,7 +173,15 @@ class GraphRAGService:
         target_code: str,
         refactoring_goals: str = "improve readability and maintainability",
     ) -> dict[str, Any]:
-        """리팩토링 제안"""
+        """리팩토링 제안
+
+        Args:
+            target_code: 대상 코드
+            refactoring_goals: 리팩토링 목표
+
+        Returns:
+            dict: 리팩토링 제안
+        """
         if self.workflow_engine:
             query = f"Suggest refactoring for code with goals: {refactoring_goals}. Code: {target_code}"
             return await self.workflow_engine.execute_workflow(
@@ -143,7 +195,15 @@ class GraphRAGService:
     async def get_enriched_context(
         self, query: str, include_relationships: bool = True, **kwargs
     ) -> dict[str, Any]:
-        """풍부한 컨텍스트 정보 제공"""
+        """풍부한 컨텍스트 정보 제공
+
+        Args:
+            query: 검색 쿼리
+            include_relationships: 관계 포함 여부
+
+        Returns:
+            dict: 컨텍스트 정보
+        """
         if self.workflow_engine:
             return await self.workflow_engine.execute_workflow(
                 query, RAGWorkflowType.CONTEXTUAL_ANALYSIS
@@ -153,9 +213,17 @@ class GraphRAGService:
 
     # 기본 검색 메서드들 (워크플로우 없을 때의 fallback)
     async def _basic_search(
-        self, query: str, limit: int = None, **kwargs
+        self, query: str, limit: int | None = None, **kwargs
     ) -> dict[str, Any]:
-        """기본 검색 (워크플로우 없을 때)"""
+        """기본 검색 (워크플로우 없을 때)
+
+        Args:
+            query: 검색 쿼리
+            limit: 반환 결과 수 제한 (선택사항)
+
+        Returns:
+            dict: 검색 결과
+        """
         try:
             query_embedding = self.embedding_service.create_query_embedding(query)
             if not query_embedding:
@@ -252,9 +320,13 @@ class GraphRAGService:
 
     # 유틸리티 메서드들
     def get_service_status(self) -> dict[str, Any]:
-        """서비스 상태 정보"""
+        """서비스 상태 정보
+
+        Returns:
+            dict: 서비스 상태 정보
+        """
         return {
-            "neo4j_available": self.neo4j_handler is not None,
+            "neo4j_available": self.neo4j_persistence is not None,
             "embedding_available": self.embedding_service.is_available(),
             "llm_available": self.llm_manager.is_available()
             if self.llm_manager

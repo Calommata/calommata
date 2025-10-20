@@ -221,12 +221,14 @@ name = "code-analyzer-graph"
 version = "0.2.0"
 source = { directory = "../graph" }
 dependencies = [
+    { name = "neo4j" },
     { name = "pydantic" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=23.0.0" },
+    { name = "neo4j", specifier = ">=6.0.2" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0.0" },
@@ -253,6 +255,12 @@ requires-dist = [
     { name = "tree-sitter-python", specifier = ">=0.25.0" },
 ]
 provides-extras = ["test"]
+
+[package.metadata.requires-dev]
+test = [
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
+]
 
 [[package]]
 name = "colorama"
