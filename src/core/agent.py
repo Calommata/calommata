@@ -139,11 +139,10 @@ class CodeRAGAgent(BaseModel):
             # 쿼리 임베딩 생성
             query_embedding = self.embedder.embed_code(state.query)
 
-            # 유사한 코드 검색 (GraphRAG 강화)
+            # 유사한 코드 검색 (순수 벡터 검색)
             search_results = self.retriever.search_similar_code(
                 query_embedding=query_embedding,
                 limit=5,
-                expand_results=True,  # 그래프 확장 검색 활성화
             )
 
             logger.info(f"✅ {len(search_results)}개 코드 검색 완료")

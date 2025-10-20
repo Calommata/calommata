@@ -120,6 +120,7 @@ class Neo4jQueries:
         YIELD node, score
         WHERE score >= $similarity_threshold 
           AND (node.project_name = $project_name OR $project_name IS NULL)
+          AND node.type <> 'Module'
         RETURN node.id AS id,
                node.name AS name,
                node.type AS type,

@@ -38,7 +38,7 @@ def test_config() -> CoreConfig:
         pytest.skip("GOOGLE_API_KEY 환경변수가 설정되지 않았습니다")
 
     config.llm.api_key = api_key
-    config.llm.model_name = "gemini-2.0-flash"
+    config.llm.model_name = "gemini-2.0-flash-lite"
     config.llm.temperature = 0.1
     config.llm.max_tokens = 1024  # 작게 설정하여 무료 플랜 보호
 

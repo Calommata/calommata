@@ -66,9 +66,9 @@ class CodeRetriever(BaseModel):
 
     persistence: Neo4jPersistence = Field(..., description="Neo4j 지속성 객체")
 
-    similarity_threshold: float = Field(default=0.5, description="유사도 임계값 (0-1)")
+    similarity_threshold: float = Field(default=0.7, description="유사도 임계값 (0-1)")
 
-    max_results: int = Field(default=5, description="최대 검색 결과 수")
+    max_results: int = Field(default=10, description="최대 검색 결과 수")
 
     context_depth: int = Field(default=2, description="그래프 탐색 깊이")
 
@@ -80,15 +80,13 @@ class CodeRetriever(BaseModel):
         query_embedding: list[float],
         limit: int | None = None,
         threshold: float | None = None,
-        expand_results: bool = True,
     ) -> list[CodeSearchResult]:
-        """임베딩 유사도 기반 코드 검색 (GraphRAG 강화)
+        """임베딩 유사도 기반 코드 검색
 
         Args:
             query_embedding: 쿼리 임베딩 벡터
             limit: 최대 결과 수 (None이면 기본값 사용)
             threshold: 유사도 임계값 (None이면 기본값 사용)
-            expand_results: 그래프 탐색으로 결과 확장 여부
 
         Returns:
             검색 결과 리스트
@@ -106,30 +104,16 @@ class CodeRetriever(BaseModel):
 
             logger.info(f"✅ {len(results)}개의 유사 코드 발견")
 
-            # 각 결과에 대해 컨텍스트 정보 가져오기
+            # 검색 결과 변환
             search_results = []
-            expanded_node_ids = set()  # 중복 방지
-
             for result in results:
-                # 기본 결과 추가
                 search_result = self._create_search_result(result)
                 search_results.append(search_result)
-                expanded_node_ids.add(result["id"])
 
-                # 그래프 확장 검색 (MVP 최적화)
-                if expand_results:
-                    related_results = self._expand_search_with_graph(
-                        result["id"],
-                        expanded_node_ids,
-                        max_expansion=2,  # MVP에서는 제한적 확장
-                    )
-                    search_results.extend(related_results)
-
-            # 유사도 점수로 정렬 (확장된 결과는 낮은 점수를 가짐)
+            # 유사도 점수로 정렬
             search_results.sort(key=lambda x: x.similarity_score, reverse=True)
 
-            # 최종 limit 적용
-            return search_results[:limit]
+            return search_results
 
         except Exception as e:
             logger.error(f"❌ 코드 검색 실패: {e}")
@@ -285,69 +269,6 @@ class CodeRetriever(BaseModel):
             relationships=context.get("relationships", []),
         )
 
-    def _expand_search_with_graph(
-        self, node_id: str, expanded_node_ids: set[str], max_expansion: int = 2
-    ) -> list[CodeSearchResult]:
-        """그래프 탐색으로 검색 결과 확장
-
-        Args:
-            node_id: 확장할 기준 노드 ID
-            expanded_node_ids: 이미 포함된 노드 ID들
-            max_expansion: 최대 확장 개수
-
-        Returns:
-            확장된 검색 결과 리스트
-        """
-        try:
-            expanded_results = []
-
-            # 직접 연결된 노드들 가져오기
-            context = self.persistence.get_node_context(node_id, depth=1)
-            related_nodes = context.get("related_nodes", [])
-
-            # 관련성이 높은 노드들 선별 (함수 호출, 클래스 상속 등)
-            high_priority_relations = ["CALLS", "INHERITS", "CONTAINS", "IMPORTS"]
-            relationships = context.get("relationships", [])
-
-            priority_nodes = []
-            for rel in relationships:
-                if rel.get("type") in high_priority_relations:
-                    target_node_id = (
-                        rel.get("end_node")
-                        if rel.get("start_node") == node_id
-                        else rel.get("start_node")
-                    )
-                    if target_node_id and target_node_id not in expanded_node_ids:
-                        # 해당 노드 정보 찾기
-                        target_node = next(
-                            (n for n in related_nodes if n.get("id") == target_node_id),
-                            None,
-                        )
-                        if target_node:
-                            priority_nodes.append(target_node)
-
-            # 최대 확장 개수까지만 추가
-            for node in priority_nodes[:max_expansion]:
-                expanded_result = CodeSearchResult(
-                    node_id=node.get("id", ""),
-                    name=node.get("name", ""),
-                    node_type=node.get("type", ""),
-                    file_path=node.get("file_path", ""),
-                    source_code=node.get("source_code", ""),
-                    docstring=node.get("docstring"),
-                    similarity_score=0.5,  # 확장된 결과는 낮은 점수
-                    related_nodes=[],
-                    relationships=[],
-                )
-                expanded_results.append(expanded_result)
-                expanded_node_ids.add(node.get("id", ""))
-
-            return expanded_results
-
-        except Exception as e:
-            logger.error(f"❌ 그래프 확장 검색 실패: {e}")
-            return []
-
     def search_with_hybrid_approach(
         self,
         query_embedding: list[float],
@@ -371,7 +292,6 @@ class CodeRetriever(BaseModel):
             vector_results = self.search_similar_code(
                 query_embedding,
                 limit=self.max_results * 2,  # 더 많이 가져와서 재순위
-                expand_results=False,
             )
 
             # 2. 키워드 기반 텍스트 검색 결과도 포함
