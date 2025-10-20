@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from src.code_block import BlockType, CodeBlock, DependencyType
-from src.graph_builder import CodeAnalyzer
+from src.code_block import CodeBlock, DependencyType
+from packages.parser.src.code_analyzer import CodeAnalyzer
 
 # 현재 디렉토리 reference
 current_dir = Path(__file__).parent.parent

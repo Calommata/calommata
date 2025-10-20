@@ -4,7 +4,7 @@ Docstring 추출 테스트
 
 from pathlib import Path
 
-from src.graph_builder import CodeAnalyzer
+from packages.parser.src.code_analyzer import CodeAnalyzer
 
 # 현재 디렉토리 reference
 current_dir = Path(__file__).parent.parent

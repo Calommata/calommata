@@ -1,7 +1,6 @@
 """Base parser implementation using tree-sitter"""
 
 import logging
-from typing import Any
 
 from tree_sitter import Language, Parser, Tree
 
@@ -18,7 +17,7 @@ class BaseParser:
         parser: Tree-sitter 파서 인스턴스
     """
 
-    def __init__(self, lang: Any) -> None:
+    def __init__(self, lang: object) -> None:
         """파서 초기화
 
         Args:

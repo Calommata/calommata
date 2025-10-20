@@ -14,7 +14,7 @@ sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "packages"))
 
 try:
-    from parser.src.graph_builder import CodeAnalyzer
+    from packages.parser.src.code_analyzer import CodeAnalyzer
     from graph.src.adapter import ParserToGraphAdapter
     from graph.src.models import CodeGraph
     from src.neo4j_handler import Neo4jHandler

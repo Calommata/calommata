@@ -231,7 +231,7 @@ class TestEdgeCases:
         """빈 코드 처리 테스트"""
         code = ""
         parser = BaseParser(tslanguage.language())
-        
+
         # 빈 코드는 ValueError를 발생시켜야 함
         with pytest.raises(ValueError):
             parser.parse_code(code)
