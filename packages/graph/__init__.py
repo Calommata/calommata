@@ -27,6 +27,7 @@ from .src.utils import (
     export_graph_json,
     validate_graph,
 )
+from .src.persistence import Neo4jPersistence
 
 
 __all__ = [
@@ -46,4 +47,5 @@ __all__ = [
     "export_graph_json",
     "export_graph_dot",
     "analyze_graph_complexity",
+    "Neo4jPersistence",
 ]
