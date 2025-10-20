@@ -159,10 +159,13 @@ class Neo4jQueries:
     """
 
     GET_TOTAL_STATS = """
-        MATCH (n)
-        OPTIONAL MATCH ()-[r]->()
-        RETURN count(DISTINCT n) AS total_nodes,
-               count(r) AS total_relationships
+        CALL () {
+            MATCH (n) RETURN count(n) AS total_nodes
+        }
+        CALL () {
+            MATCH ()-[r]->() RETURN count(r) AS total_relationships
+        }
+        RETURN total_nodes, total_relationships
     """
 
     # ========== 유틸리티 ==========
