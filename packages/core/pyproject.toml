@@ -1,11 +1,26 @@
 [project]
 name = "code-analyzer-core"
-version = "0.1.0"
-description = "Interact with LLM and control db"
+version = "0.2.0"
+description = "LLM-powered code analysis and GraphRAG service"
 requires-python = ">=3.13"
 dependencies = [
-    "langgraph>=1.0.0a4",
+    # LangChain ecosystem - 핵심 기능만
+    "langchain-community>=0.3.0",
+    "langchain-core>=0.3.0", 
+    "langchain-openai>=0.2.0",
+    "langchain-google-genai>=2.0.0",
+    "langgraph>=0.2.30",
+    
+    # Database & Data
+    "neo4j>=6.0.2",
+    "pydantic>=2.12.0",
+    "numpy>=1.24.0",
+    
+    # Project dependencies 
+    "code-analyzer-parser",
+    "code-analyzer-graph",
 ]
 
 [tool.uv.sources]
-ast-parser = { path = "../parser" }
+code-analyzer-parser = { path = "../parser" }
+code-analyzer-graph = { path = "../graph" }
