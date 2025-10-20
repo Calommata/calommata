@@ -1,0 +1,5 @@
+- using uv for package manager, must use uv for any package related job
+- using python 3.13, write code that recommended in python 3.13
+- modularize as possible
+- don't write any defensive logic
+- format codes with `uv format` when you finish your work
