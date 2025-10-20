@@ -8,23 +8,18 @@ import sys
 import logging
 from pathlib import Path
 
+from packages.parser.src.code_analyzer import CodeAnalyzer
+from graph.src.adapter import ParserToGraphAdapter
+from graph.src.models import CodeGraph
+from graph.src.persistence import Neo4jPersistence
+from src.embedding_service import EmbeddingService
+from src.code_vectorizer import CodeVectorizer
+from src.graph_rag import GraphRAGService, RAGConfig
+
 # 패키지 경로 추가 후 import
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "packages"))
-
-try:
-    from packages.parser.src.code_analyzer import CodeAnalyzer
-    from graph.src.adapter import ParserToGraphAdapter
-    from graph.src.models import CodeGraph
-    from graph.src.persistence import Neo4jPersistence
-    from src.embedding_service import EmbeddingService
-    from src.code_vectorizer import CodeVectorizer
-    from src.graph_rag import GraphRAGService, RAGConfig
-except ImportError as e:
-    print(f"Import 오류: {e}")
-    print("패키지 경로를 확인하고 필요한 패키지가 설치되어 있는지 확인하세요.")
-    sys.exit(1)
 
 
 class CodeAnalysisOrchestrator:

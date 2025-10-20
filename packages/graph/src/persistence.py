@@ -3,6 +3,13 @@ Neo4j 데이터베이스 지속성 계층
 
 코드 그래프의 저장, 조회, 벡터 인덱스 관리를 담당합니다.
 Graph 패키지의 모델 데이터를 Neo4j에 저장하고 검색하는 기능을 제공합니다.
+
+리팩토링된 버전:
+- 쿼리 분리 (queries.py)
+- 예외 처리 개선 (exceptions.py)
+- 배치 처리 최적화
+- 타입 힌팅 강화
+- 로깅 개선
 """
 
 import logging
@@ -12,19 +19,36 @@ from typing import Any
 from neo4j import Driver, GraphDatabase
 from neo4j.exceptions import AuthError, ServiceUnavailable
 
+from .exceptions import (
+    ConnectionError as PersistenceConnectionError,
+    IndexCreationError,
+    InvalidDataError,
+    NodeNotFoundError,
+)
 from .models import CodeGraph, CodeNode, CodeRelation
+from .queries import Neo4jQueries
 
 logger = logging.getLogger(__name__)
 
 
 class Neo4jPersistence:
-    """Neo4j 데이터베이스 연결 및 그래프 지속성 관리"""
+    """Neo4j 데이터베이스 연결 및 그래프 지속성 관리
+
+    리팩토링된 버전:
+    - 배치 크기 설정 가능
+    - 타입 안전성 강화
+    - 에러 처리 개선
+    """
+
+    # 기본 배치 크기
+    DEFAULT_BATCH_SIZE = 500
 
     def __init__(
         self,
         uri: str | None = None,
         user: str | None = None,
         password: str | None = None,
+        batch_size: int = DEFAULT_BATCH_SIZE,
     ):
         """Neo4j 지속성 계층 초기화
 
@@ -32,102 +56,113 @@ class Neo4jPersistence:
             uri: Neo4j 데이터베이스 URI (환경변수 NEO4J_URI 사용 가능)
             user: 사용자명 (환경변수 NEO4J_USER 사용 가능)
             password: 패스워드 (환경변수 NEO4J_PASSWORD 사용 가능)
+            batch_size: 배치 처리 크기 (기본값: 500)
         """
         self.uri = uri or os.getenv("NEO4J_URI", "bolt://localhost:7687")
         self.user = user or os.getenv("NEO4J_USER", "neo4j")
         self.password = password or os.getenv("NEO4J_PASSWORD", "password")
+        self.batch_size = batch_size
 
-        self.driver: Driver | None = None
+        self._driver: Driver | None = None
         self.logger = logger
+        self._queries = Neo4jQueries()
+
+    @property
+    def driver(self) -> Driver:
+        """드라이버 속성 - 연결되지 않았으면 예외 발생"""
+        if self._driver is None:
+            raise PersistenceConnectionError("데이터베이스에 연결되지 않음")
+        return self._driver
+
+    @property
+    def is_connected(self) -> bool:
+        """연결 상태 확인"""
+        return self._driver is not None
 
     def connect(self) -> bool:
         """Neo4j 데이터베이스에 연결
 
         Returns:
             bool: 연결 성공 여부
+
+        Raises:
+            PersistenceConnectionError: 연결 실패 시
         """
         try:
-            self.driver = GraphDatabase.driver(
+            self._driver = GraphDatabase.driver(
                 self.uri, auth=(self.user, self.password)
             )
             # 연결 테스트
-            with self.driver.session() as session:
-                session.run("RETURN 1")
+            with self._driver.session() as session:
+                session.run(self._queries.TEST_CONNECTION)
 
             self.logger.info(f"✅ Neo4j 연결 성공: {self.uri}")
             return True
 
         except (ServiceUnavailable, AuthError) as e:
             self.logger.error(f"❌ Neo4j 연결 실패: {e}")
-            return False
+            self._driver = None
+            raise PersistenceConnectionError(f"Neo4j 연결 실패: {e}") from e
         except Exception as e:
             self.logger.error(f"❌ 예상치 못한 오류: {e}")
-            return False
+            self._driver = None
+            raise PersistenceConnectionError(f"예상치 못한 연결 오류: {e}") from e
 
     def close(self) -> None:
         """연결 종료"""
-        if self.driver:
-            self.driver.close()
-            self.logger.info("Neo4j 연결 종료")
+        if self._driver:
+            try:
+                self._driver.close()
+                self.logger.info("✅ Neo4j 연결 종료")
+            except Exception as e:
+                self.logger.warning(f"⚠️ 연결 종료 중 오류: {e}")
+            finally:
+                self._driver = None
 
     def create_constraints_and_indexes(self) -> bool:
         """데이터베이스 제약 조건 및 인덱스 생성
 
         Returns:
             bool: 성공 여부
-        """
-        if not self.driver:
-            self.logger.error("데이터베이스에 연결되지 않음")
-            return False
 
+        Raises:
+            IndexCreationError: 인덱스 생성 실패 시
+        """
         try:
             with self.driver.session() as session:
-                # 코드 노드 제약 조건
-                constraints = [
-                    "CREATE CONSTRAINT code_node_id IF NOT EXISTS FOR (n:CodeNode) REQUIRE n.id IS UNIQUE",
-                    "CREATE CONSTRAINT project_name IF NOT EXISTS FOR (p:Project) REQUIRE p.name IS UNIQUE",
-                ]
+                # 제약 조건 생성
+                for constraint in self._queries.CONSTRAINTS:
+                    self._execute_schema_query(session, constraint, "제약 조건")
 
-                # 기본 인덱스
-                indexes = [
-                    "CREATE INDEX code_node_type IF NOT EXISTS FOR (n:CodeNode) ON (n.type)",
-                    "CREATE INDEX code_node_file IF NOT EXISTS FOR (n:CodeNode) ON (n.file_path)",
-                    "CREATE TEXT INDEX code_node_content IF NOT EXISTS FOR (n:CodeNode) ON (n.source_code)",
-                ]
+                # 기본 인덱스 생성
+                for index in self._queries.INDEXES:
+                    self._execute_schema_query(session, index, "인덱스")
 
-                # 벡터 인덱스 (코드 임베딩용)
-                vector_indexes = [
-                    """
-                    CREATE VECTOR INDEX code_embedding_index IF NOT EXISTS 
-                    FOR (n:CodeNode) ON (n.embedding) 
-                    OPTIONS {
-                        indexConfig: {
-                            `vector.dimensions`: 384,
-                            `vector.similarity_function`: 'cosine'
-                        }
-                    }
-                    """
-                ]
+                # 벡터 인덱스 생성
+                self._execute_schema_query(
+                    session, self._queries.VECTOR_INDEX, "벡터 인덱스"
+                )
 
-                for constraint in constraints:
-                    try:
-                        session.run(constraint)
-                        self.logger.info(f"✅ 제약 조건 생성: {constraint[:50]}...")
-                    except Exception as e:
-                        self.logger.warning(f"⚠️ 제약 조건 생성 실패: {e}")
-
-                for index in indexes + vector_indexes:
-                    try:
-                        session.run(index)
-                        self.logger.info(f"✅ 인덱스 생성: {index[:50]}...")
-                    except Exception as e:
-                        self.logger.warning(f"⚠️ 인덱스 생성 실패: {e}")
-
+            self.logger.info("✅ 모든 제약 조건 및 인덱스 생성 완료")
             return True
 
         except Exception as e:
             self.logger.error(f"❌ 제약 조건/인덱스 생성 실패: {e}")
-            return False
+            raise IndexCreationError(f"인덱스 생성 실패: {e}") from e
+
+    def _execute_schema_query(self, session: Any, query: str, description: str) -> None:
+        """스키마 쿼리 실행 헬퍼 메서드
+
+        Args:
+            session: Neo4j 세션
+            query: 실행할 쿼리
+            description: 쿼리 설명 (로깅용)
+        """
+        try:
+            session.run(query)
+            self.logger.info(f"✅ {description} 생성: {query[:50]}...")
+        except Exception as e:
+            self.logger.warning(f"⚠️ {description} 생성 실패 (이미 존재할 수 있음): {e}")
 
     def save_code_graph(
         self, graph: CodeGraph, project_name: str | None = None
@@ -140,25 +175,24 @@ class Neo4jPersistence:
 
         Returns:
             bool: 저장 성공 여부
-        """
-        if not self.driver:
-            self.logger.error("데이터베이스에 연결되지 않음")
-            return False
 
+        Raises:
+            InvalidDataError: 유효하지 않은 데이터
+        """
         project_name = project_name or graph.project_name
+
+        if not project_name:
+            raise InvalidDataError("프로젝트 이름이 필요합니다")
 
         try:
             # 1단계: 프로젝트 정보 저장
-            if not self._save_project_info(graph, project_name):
-                return False
+            self._save_project_info(graph, project_name)
 
-            # 2단계: 노드 저장
-            if not self._save_code_nodes(list(graph.nodes.values()), project_name):
-                return False
+            # 2단계: 노드 저장 (배치 처리)
+            self._save_code_nodes_batch(list(graph.nodes.values()), project_name)
 
-            # 3단계: 관계 저장
-            if not self._save_code_relations(graph.relations):
-                return False
+            # 3단계: 관계 저장 (배치 처리)
+            self._save_code_relations_batch(graph.relations)
 
             self.logger.info(
                 f"✅ 그래프 저장 완료: {len(graph.nodes)}개 노드, "
@@ -168,28 +202,19 @@ class Neo4jPersistence:
 
         except Exception as e:
             self.logger.error(f"❌ 그래프 저장 실패: {e}")
-            return False
+            raise
 
-    def _save_project_info(self, graph: CodeGraph, project_name: str) -> bool:
-        """프로젝트 정보 저장 (내부 메서드)"""
+    def _save_project_info(self, graph: CodeGraph, project_name: str) -> None:
+        """프로젝트 정보 저장 (내부 메서드)
+
+        Raises:
+            QueryExecutionError: 쿼리 실행 실패 시
+        """
         try:
             with self.driver.session() as session:
-                project_query = """
-                MERGE (p:Project {name: $name})
-                SET p.path = $path,
-                    p.total_files = $total_files,
-                    p.total_lines = $total_lines,
-                    p.total_nodes = $total_nodes,
-                    p.total_relations = $total_relations,
-                    p.analysis_version = $analysis_version,
-                    p.created_at = $created_at,
-                    p.updated_at = datetime()
-                RETURN p
-                """
-
                 stats = graph.get_statistics()
                 session.run(
-                    project_query,
+                    self._queries.MERGE_PROJECT,
                     name=project_name,
                     path=graph.project_path,
                     total_files=graph.total_files,
@@ -199,105 +224,118 @@ class Neo4jPersistence:
                     analysis_version=graph.analysis_version,
                     created_at=graph.created_at.isoformat(),
                 )
-                return True
+                self.logger.info(f"✅ 프로젝트 정보 저장: {project_name}")
 
         except Exception as e:
             self.logger.error(f"❌ 프로젝트 정보 저장 실패: {e}")
-            return False
+            raise
 
-    def _save_code_nodes(self, nodes: list[CodeNode], project_name: str) -> bool:
-        """코드 노드들을 배치로 저장 (내부 메서드)"""
+    def _save_code_nodes_batch(self, nodes: list[CodeNode], project_name: str) -> None:
+        """코드 노드들을 배치로 저장 (내부 메서드)
+
+        Args:
+            nodes: 저장할 노드 리스트
+            project_name: 프로젝트 이름
+
+        Raises:
+            QueryExecutionError: 쿼리 실행 실패 시
+        """
+        if not nodes:
+            self.logger.warning("⚠️ 저장할 노드가 없습니다")
+            return
+
         try:
-            with self.driver.session() as session:
-                node_query = """
-                UNWIND $nodes AS node_data
-                MERGE (n:CodeNode {id: node_data.id})
-                SET n.name = node_data.name,
-                    n.type = node_data.type,
-                    n.file_path = node_data.file_path,
-                    n.start_line = node_data.start_line,
-                    n.end_line = node_data.end_line,
-                    n.source_code = node_data.source_code,
-                    n.docstring = node_data.docstring,
-                    n.complexity = node_data.complexity,
-                    n.scope_level = node_data.scope_level,
-                    n.embedding = node_data.embedding,
-                    n.embedding_model = node_data.embedding_model,
-                    n.created_at = node_data.created_at,
-                    n.updated_at = datetime()
-                
-                WITH n, node_data
-                MATCH (p:Project {name: $project_name})
-                MERGE (p)-[:CONTAINS]->(n)
-                """
+            # 배치 처리로 성능 최적화
+            total_batches = (len(nodes) + self.batch_size - 1) // self.batch_size
+
+            for batch_idx in range(total_batches):
+                start_idx = batch_idx * self.batch_size
+                end_idx = min((batch_idx + 1) * self.batch_size, len(nodes))
+                batch = nodes[start_idx:end_idx]
 
                 # Neo4j 형식으로 변환
-                neo4j_nodes = [node.to_neo4j_node() for node in nodes]
+                neo4j_nodes = [node.to_neo4j_node() for node in batch]
 
-                session.run(node_query, nodes=neo4j_nodes, project_name=project_name)
-                self.logger.info(f"✅ {len(nodes)}개 코드 노드 저장 완료")
-                return True
-
-        except Exception as e:
-            self.logger.error(f"❌ 코드 노드 저장 실패: {e}")
-            return False
-
-    def _save_code_relations(self, relations: list[CodeRelation]) -> bool:
-        """코드 관계들을 배치로 저장 (내부 메서드)"""
-        try:
-            with self.driver.session() as session:
-                # Cypher에서 동적 관계 생성을 위해 CALL apoc.create.relationship 사용
-                # 또는 더 간단한 방식으로 사전 정의된 관계 타입만 사용 가능
-                relation_query = """
-                UNWIND $relations AS rel_data
-                MATCH (from:CodeNode {id: rel_data.from_node_id})
-                MATCH (to:CodeNode {id: rel_data.to_node_id})
-                CALL apoc.create.relationship(from, rel_data.relation_type, {
-                    weight: rel_data.weight,
-                    line_number: rel_data.line_number,
-                    context: rel_data.context,
-                    created_at: rel_data.created_at
-                }, to) YIELD rel
-                RETURN count(rel)
-                """
-
-                # Neo4j 형식으로 변환
-                neo4j_relations = [rel.to_neo4j_relation() for rel in relations]
-
-                session.run(relation_query, relations=neo4j_relations)
-                self.logger.info(f"✅ {len(relations)}개 코드 관계 저장 완료")
-                return True
-
-        except Exception as e:
-            # APOC 라이브러리가 없을 수 있으므로 폴백
-            self.logger.warning(f"⚠️ APOC 사용 실패, 대체 방식으로 관계 저장: {e}")
-            return self._save_code_relations_fallback(relations)
-
-    def _save_code_relations_fallback(self, relations: list[CodeRelation]) -> bool:
-        """APOC 없이 관계 저장 (폴백 메서드)"""
-        try:
-            with self.driver.session() as session:
-                for rel in relations:
-                    # 사전 정의된 관계 타입으로만 생성
-                    rel_type = (
-                        rel.relation_type.value
-                        if hasattr(rel.relation_type, "value")
-                        else str(rel.relation_type)
+                with self.driver.session() as session:
+                    session.run(
+                        self._queries.MERGE_CODE_NODES_BATCH,
+                        nodes=neo4j_nodes,
+                        project_name=project_name,
                     )
 
-                    query = f"""
-                    MATCH (from:CodeNode {{id: $from_id}})
-                    MATCH (to:CodeNode {{id: $to_id}})
-                    CREATE (from)-[:{rel_type} {{
-                        weight: $weight,
-                        line_number: $line_number,
-                        context: $context,
-                        created_at: $created_at
-                    }}]->(to)
-                    """
+                self.logger.info(
+                    f"✅ 노드 배치 {batch_idx + 1}/{total_batches} 저장 완료 "
+                    f"({len(batch)}개)"
+                )
 
+            self.logger.info(f"✅ 총 {len(nodes)}개 코드 노드 저장 완료")
+
+        except Exception as e:
+            self.logger.error(f"❌ 코드 노드 배치 저장 실패: {e}")
+            raise
+
+    def _save_code_relations_batch(self, relations: list[CodeRelation]) -> None:
+        """코드 관계들을 배치로 저장 (내부 메서드)
+
+        Args:
+            relations: 저장할 관계 리스트
+
+        Raises:
+            QueryExecutionError: 쿼리 실행 실패 시
+        """
+        if not relations:
+            self.logger.warning("⚠️ 저장할 관계가 없습니다")
+            return
+
+        try:
+            # 관계 타입별로 그룹화하여 배치 처리
+            relations_by_type: dict[str, list[CodeRelation]] = {}
+            for rel in relations:
+                rel_type = (
+                    rel.relation_type.value
+                    if hasattr(rel.relation_type, "value")
+                    else str(rel.relation_type)
+                )
+                if rel_type not in relations_by_type:
+                    relations_by_type[rel_type] = []
+                relations_by_type[rel_type].append(rel)
+
+            # 각 타입별로 배치 저장
+            total_saved = 0
+            for rel_type, type_relations in relations_by_type.items():
+                self._save_relations_of_type(rel_type, type_relations)
+                total_saved += len(type_relations)
+
+            self.logger.info(f"✅ 총 {total_saved}개 코드 관계 저장 완료")
+
+        except Exception as e:
+            self.logger.error(f"❌ 코드 관계 배치 저장 실패: {e}")
+            raise
+
+    def _save_relations_of_type(
+        self, relation_type: str, relations: list[CodeRelation]
+    ) -> None:
+        """특정 타입의 관계들을 배치로 저장
+
+        Args:
+            relation_type: 관계 타입
+            relations: 해당 타입의 관계 리스트
+        """
+        total_batches = (len(relations) + self.batch_size - 1) // self.batch_size
+
+        for batch_idx in range(total_batches):
+            start_idx = batch_idx * self.batch_size
+            end_idx = min((batch_idx + 1) * self.batch_size, len(relations))
+            batch = relations[start_idx:end_idx]
+
+            # 쿼리 생성 및 실행
+            query = self._queries.create_relation_query(relation_type)
+
+            with self.driver.session() as session:
+                for rel in batch:
+                    # 동적으로 생성된 쿼리이므로 타입 체크 무시
                     session.run(
-                        query,
+                        query,  # type: ignore[arg-type]
                         from_id=rel.from_node_id,
                         to_id=rel.to_node_id,
                         weight=rel.weight,
@@ -306,12 +344,10 @@ class Neo4jPersistence:
                         created_at=rel.created_at.isoformat(),
                     )
 
-                self.logger.info(f"✅ {len(relations)}개 코드 관계 저장 완료 (폴백)")
-                return True
-
-        except Exception as e:
-            self.logger.error(f"❌ 관계 저장 폴백 실패: {e}")
-            return False
+            self.logger.info(
+                f"✅ {relation_type} 관계 배치 {batch_idx + 1}/{total_batches} "
+                f"저장 완료 ({len(batch)}개)"
+            )
 
     def update_node_embedding(
         self, node_id: str, embedding: list[float], model: str
@@ -325,35 +361,30 @@ class Neo4jPersistence:
 
         Returns:
             bool: 성공 여부
-        """
-        if not self.driver:
-            self.logger.error("데이터베이스에 연결되지 않음")
-            return False
 
+        Raises:
+            NodeNotFoundError: 노드를 찾을 수 없을 때
+        """
         try:
             with self.driver.session() as session:
-                query = """
-                MATCH (n:CodeNode {id: $node_id})
-                SET n.embedding = $embedding,
-                    n.embedding_model = $model,
-                    n.updated_at = datetime()
-                RETURN n
-                """
-
                 result = session.run(
-                    query, node_id=node_id, embedding=embedding, model=model
+                    self._queries.UPDATE_NODE_EMBEDDING,
+                    node_id=node_id,
+                    embedding=embedding,
+                    model=model,
                 )
 
                 if result.single():
                     self.logger.info(f"✅ 임베딩 업데이트: {node_id}")
                     return True
                 else:
-                    self.logger.warning(f"⚠️ 노드를 찾을 수 없음: {node_id}")
-                    return False
+                    raise NodeNotFoundError(f"노드를 찾을 수 없음: {node_id}")
 
+        except NodeNotFoundError:
+            raise
         except Exception as e:
             self.logger.error(f"❌ 임베딩 업데이트 실패: {e}")
-            return False
+            raise
 
     def vector_search(
         self,
@@ -366,39 +397,23 @@ class Neo4jPersistence:
         Args:
             query_embedding: 쿼리 임베딩 벡터
             limit: 반환할 최대 결과 수
-            similarity_threshold: 유사도 임계값
+            similarity_threshold: 유사도 임계값 (0.0 ~ 1.0)
 
         Returns:
             list[dict]: 유사한 노드들의 정보 리스트
         """
-        if not self.driver:
-            self.logger.error("데이터베이스에 연결되지 않음")
-            return []
-
         try:
             with self.driver.session() as session:
-                query = """
-                CALL db.index.vector.queryNodes('code_embedding_index', $limit, $query_embedding)
-                YIELD node, score
-                WHERE score >= $similarity_threshold
-                RETURN node.id AS id,
-                       node.name AS name,
-                       node.type AS type,
-                       node.file_path AS file_path,
-                       node.source_code AS source_code,
-                       node.docstring AS docstring,
-                       score
-                ORDER BY score DESC
-                """
-
                 result = session.run(
-                    query,
+                    self._queries.VECTOR_SEARCH,
                     query_embedding=query_embedding,
                     limit=limit,
                     similarity_threshold=similarity_threshold,
                 )
 
-                return [record.data() for record in result]
+                results = [record.data() for record in result]
+                self.logger.info(f"✅ 벡터 검색 완료: {len(results)}개 결과")
+                return results
 
         except Exception as e:
             self.logger.error(f"❌ 벡터 검색 실패: {e}")
@@ -409,45 +424,33 @@ class Neo4jPersistence:
 
         Args:
             node_id: 조회할 노드 ID
-            depth: 주변 관계 깊이
+            depth: 주변 관계 깊이 (기본값: 2)
 
         Returns:
             dict: 노드 정보와 관련 노드들
         """
-        if not self.driver:
-            self.logger.error("데이터베이스에 연결되지 않음")
-            return {"center_node": None, "related_nodes": [], "relationships": []}
-
         try:
             with self.driver.session() as session:
-                query = """
-                MATCH (center:CodeNode {id: $node_id})
-                OPTIONAL MATCH path = (center)-[*1..$depth]-(related:CodeNode)
-                WITH center, collect(DISTINCT related) AS related_nodes,
-                     collect(DISTINCT relationships(path)) AS all_relationships
-                
-                RETURN center,
-                       related_nodes,
-                       [r IN all_relationships | {
-                           type: type(r),
-                           start_node: startNode(r).id,
-                           end_node: endNode(r).id,
-                           properties: properties(r)
-                       }] AS relationships
-                """
-
-                result = session.run(query, node_id=node_id, depth=depth)
+                result = session.run(
+                    self._queries.GET_NODE_CONTEXT, node_id=node_id, depth=depth
+                )
                 record = result.single()
 
                 if record:
+                    # 관계를 필터링하여 None 제거
+                    relationships = [
+                        rel for rel in record["relationships"] if rel is not None
+                    ]
+
                     return {
                         "center_node": dict(record["center"]),
                         "related_nodes": [
                             dict(node) for node in record["related_nodes"]
                         ],
-                        "relationships": record["relationships"],
+                        "relationships": relationships,
                     }
                 else:
+                    self.logger.warning(f"⚠️ 노드를 찾을 수 없음: {node_id}")
                     return {
                         "center_node": None,
                         "related_nodes": [],
@@ -464,44 +467,34 @@ class Neo4jPersistence:
         Returns:
             dict: 노드, 관계, 타입별 통계
         """
-        if not self.driver:
-            self.logger.error("데이터베이스에 연결되지 않음")
-            return {}
-
         try:
             with self.driver.session() as session:
                 # 노드 수 조회
-                node_stats = session.run(
-                    """
-                    MATCH (n:CodeNode)
-                    RETURN n.type AS type, count(n) AS count
-                    """
-                ).data()
+                node_stats = session.run(self._queries.GET_NODE_STATS).data()
 
                 # 관계 수 조회
-                rel_stats = session.run(
-                    """
-                    MATCH ()-[r]->()
-                    RETURN type(r) AS type, count(r) AS count
-                    """
-                ).data()
+                rel_stats = session.run(self._queries.GET_RELATION_STATS).data()
 
                 # 전체 통계
-                total_stats = session.run(
-                    """
-                    MATCH (n)
-                    OPTIONAL MATCH ()-[r]->()
-                    RETURN count(DISTINCT n) AS total_nodes,
-                           count(r) AS total_relationships
-                    """
-                ).single()
+                total_stats_record = session.run(self._queries.GET_TOTAL_STATS).single()
+
+                if not total_stats_record:
+                    self.logger.warning("⚠️ 통계 데이터를 찾을 수 없음")
+                    return {}
 
                 return {
-                    "total_nodes": total_stats["total_nodes"],
-                    "total_relationships": total_stats["total_relationships"],
-                    "node_types": {stat["type"]: stat["count"] for stat in node_stats},
+                    "total_nodes": total_stats_record["total_nodes"] or 0,
+                    "total_relationships": total_stats_record["total_relationships"]
+                    or 0,
+                    "node_types": {
+                        stat["type"]: stat["count"]
+                        for stat in node_stats
+                        if stat["type"]
+                    },
                     "relation_types": {
-                        stat["type"]: stat["count"] for stat in rel_stats
+                        stat["type"]: stat["count"]
+                        for stat in rel_stats
+                        if stat["type"]
                     },
                 }
 
@@ -518,19 +511,9 @@ class Neo4jPersistence:
         Returns:
             bool: 성공 여부
         """
-        if not self.driver:
-            self.logger.error("데이터베이스에 연결되지 않음")
-            return False
-
         try:
             with self.driver.session() as session:
-                query = """
-                MATCH (p:Project {name: $project_name})
-                OPTIONAL MATCH (p)-[:CONTAINS]->(n:CodeNode)
-                DETACH DELETE p, n
-                """
-
-                session.run(query, project_name=project_name)
+                session.run(self._queries.DELETE_PROJECT, project_name=project_name)
                 self.logger.info(f"✅ 프로젝트 데이터 삭제: {project_name}")
                 return True
 
@@ -538,11 +521,25 @@ class Neo4jPersistence:
             self.logger.error(f"❌ 프로젝트 데이터 삭제 실패: {e}")
             return False
 
-    def __enter__(self):
-        """컨텍스트 매니저 진입"""
-        self.connect()
+    def __enter__(self) -> "Neo4jPersistence":
+        """컨텍스트 매니저 진입
+
+        Returns:
+            Neo4jPersistence: 자기 자신
+        """
+        try:
+            self.connect()
+        except Exception:
+            # connect 메서드에서 이미 예외를 발생시키므로 그대로 전파
+            raise
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """컨텍스트 매니저 종료"""
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """컨텍스트 매니저 종료
+
+        Args:
+            exc_type: 예외 타입
+            exc_val: 예외 값
+            exc_tb: 예외 트레이스백
+        """
         self.close()

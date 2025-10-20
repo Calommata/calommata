@@ -9,11 +9,7 @@ import logging
 from typing import Any
 
 from .embedding_service import EmbeddingService
-
-try:
-    from graph.src.persistence import Neo4jPersistence
-except ImportError:
-    Neo4jPersistence = None  # type: ignore
+from graph.src.persistence import Neo4jPersistence
 
 
 class CodeVectorizer:

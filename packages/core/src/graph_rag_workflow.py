@@ -15,12 +15,6 @@ from langchain_core.messages import BaseMessage
 from .llm_manager import LLMManager, TaskType
 from .embedding_service import EmbeddingService
 
-# Neo4jPersistence import with fallback
-try:
-    from graph.src.persistence import Neo4jPersistence
-except ImportError:
-    Neo4jPersistence = None
-
 logger = logging.getLogger(__name__)
 
 

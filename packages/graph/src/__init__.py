@@ -6,9 +6,18 @@ This package provides:
 - Adapter pattern to convert Parser output to Graph models
 - Utilities for validation, export, and analysis
 - Neo4j persistence layer for graph storage
+- Query management and exception handling
 """
 
 from .adapter import ParserToGraphAdapter
+from .exceptions import (
+    ConnectionError,
+    IndexCreationError,
+    InvalidDataError,
+    NodeNotFoundError,
+    PersistenceError,
+    QueryExecutionError,
+)
 from .models import (
     CodeGraph,
     CodeNode,
@@ -18,9 +27,10 @@ from .models import (
     RelationType,
 )
 from .persistence import Neo4jPersistence
+from .queries import Neo4jQueries
 from .utils import GraphAnalyzer, GraphExporter, GraphValidator
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     # Models
@@ -38,4 +48,12 @@ __all__ = [
     "GraphAnalyzer",
     # Persistence
     "Neo4jPersistence",
+    "Neo4jQueries",
+    # Exceptions
+    "PersistenceError",
+    "ConnectionError",
+    "QueryExecutionError",
+    "NodeNotFoundError",
+    "InvalidDataError",
+    "IndexCreationError",
 ]

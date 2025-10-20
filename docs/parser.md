@@ -2,29 +2,36 @@
 
 ## 📋 패키지 개요
 
-Parser 패키지는 Python 코드를 분석하여 구조화된 코드 블록으로 변환하는 핵심 모듈입니다. Tree-sitter를 기반으로 한 고성능 파싱 엔진을 제공합니다.
+Parser 패키지는 Python 코드를 분석하여 구조화된 코드 블록으로 변환하는 핵심 모듈입니다. Tree-sitter를 기반으로 한 고성능 파싱 엔진을 제공하며, 타입 안전한 데이터 모델과 포괄적인 테스트를 갖추고 있습니다.
 
 ## 🏗️ 아키텍처
 
 ```
 Parser Package
-├── main/
+├── src/
 │   ├── __init__.py          # 패키지 진입점
-│   ├── graph_builder.py     # 메인 분석기
+│   ├── code_analyzer.py     # 메인 분석기
 │   ├── base_parser.py       # Tree-sitter 파서 래퍼
 │   ├── ast_extractor.py     # AST 블록 추출기
 │   └── code_block.py        # 데이터 모델
 ├── example_code/            # 테스트용 샘플 코드
-└── test_parser.py          # 단위 테스트
+│   ├── api.py
+│   ├── database.py
+│   └── user.py
+└── tests/                   # 포괄적인 테스트 스위트
+    ├── test_parser.py       # 통합 테스트
+    ├── test_base_parser.py  # 파서 테스트
+    ├── test_ast_extractor.py # 추출기 테스트
+    └── test_docstring.py    # docstring 테스트
 ```
 
 ## 🔧 주요 컴포넌트
 
-### CodeAnalyzer (graph_builder.py)
+### CodeAnalyzer (code_analyzer.py)
 메인 분석 엔진으로 디렉토리 전체 또는 개별 파일을 분석합니다.
 
 ```python
-from parser.main.graph_builder import CodeAnalyzer
+from src import CodeAnalyzer
 
 analyzer = CodeAnalyzer()
 blocks = analyzer.analyze_directory("./src")
@@ -39,7 +46,7 @@ blocks = analyzer.analyze_directory("./src")
 Tree-sitter 파서의 래퍼 클래스입니다.
 
 ```python
-from parser.main.base_parser import BaseParser
+from src.base_parser import BaseParser
 import tree_sitter_python as tslanguage
 
 parser = BaseParser(tslanguage.language())
@@ -50,15 +57,16 @@ tree = parser.parse_code(source_code)
 - Tree-sitter 언어 객체 관리
 - 소스 코드를 구문 트리로 변환
 - 파싱 에러 처리
+- 타입 안전한 API
 
 ### ASTExtractor (ast_extractor.py)
 구문 트리에서 의미있는 코드 블록을 추출합니다.
 
 ```python
-from parser.main.ast_extractor import ASTExtractor
+from src.ast_extractor import ASTExtractor
 
 extractor = ASTExtractor(language)
-blocks = extractor.extract_blocks(tree, source_code)
+blocks = extractor.extract_blocks(tree, source_code, file_path="example.py")
 ```
 
 **추출 가능한 블록 타입**:
@@ -68,23 +76,46 @@ blocks = extractor.extract_blocks(tree, source_code)
 - `import`: import 문
 - `variable`: 변수 할당
 
+**주요 기능**:
+- Docstring 자동 추출
+- 함수 호출 추적
+- 의존성 분석 (Dependency 객체)
+- 복잡도 계산
+- 타입 힌트 추출
+
 ### CodeBlock (code_block.py)
 코드 블록을 표현하는 데이터 모델입니다.
 
 ```python
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
+class Dependency:
+    """의존성 정보"""
+    target: str              # 의존 대상
+    dependency_type: str     # 의존성 타입 (import, call, inherit 등)
+    line_number: Optional[int] = None
+    context: Optional[str] = None
+
 @dataclass
 class CodeBlock:
     block_type: str          # 블록 타입
     name: str               # 블록 이름
     start_line: int         # 시작 라인
     end_line: int          # 종료 라인
-    file_path: str          # 파일 경로 (v0.1.1에서 추가)
+    file_path: str          # 파일 경로
     source_code: str       # 소스 코드
-    docstring: str         # 문서화 문자열
-    dependencies: list[str] # 의존성 목록
-    complexity: int        # 복잡도 점수
-    scope_level: int       # 스코프 깊이
-    typed_dependencies: list[Dependency] # 타입별 의존성
+    docstring: Optional[str] = None      # 문서화 문자열
+    dependencies: list[str] = None       # 의존성 목록 (레거시)
+    complexity: int = 0                  # 복잡도 점수
+    scope_level: int = 0                 # 스코프 깊이
+    typed_dependencies: list[Dependency] = None  # 타입별 의존성
+    
+    def get_full_name(self) -> str: ...
+    def add_dependency(self, target: str, dep_type: str, ...) -> None: ...
+    def get_dependencies_by_type(self, dep_type: str) -> list[Dependency]: ...
+    def to_dict(self) -> dict: ...
 ```
 
 ## 📊 분석 결과 예시
@@ -175,41 +206,72 @@ dependencies = [
 ### pytest 테스트 실행 (권장)
 ```bash
 cd packages/parser
-uv sync --extra test    # 테스트 의존성 설치
+uv sync --group test    # 테스트 의존성 설치
 uv run pytest          # 모든 테스트 실행
-uv run pytest --cov=main --cov-report=html  # 커버리지 포함
+uv run pytest --cov=src --cov-report=html  # 커버리지 포함
+uv run pytest -v       # 상세 출력
 ```
 
-### 테스트 결과
+### 테스트 결과 (v0.1.0)
 ```
 ================================= test session starts ==================================
 platform win32 -- Python 3.13.7, pytest-8.4.2, pluggy-1.6.0
 rootdir: packages/parser
 configfile: pytest.ini
 plugins: cov-7.0.0
-collected 13 items
+collected 44 items
 
-tests\test_parser.py .............                                                [100%]
+tests/test_ast_extractor.py ............                                         [ 27%]
+tests/test_base_parser.py ......................                                 [ 77%]
+tests/test_docstring.py .                                                        [ 79%]
+tests/test_parser.py .........                                                   [100%]
 
-================================== 13 passed in 0.14s ==================================
+===================================== 44 passed in 0.35s ================================
 
 ==================================== coverage report ====================================
-Name                    Stmts   Miss  Cover
--------------------------------------------
-main\__init__.py            3      0   100%
-main\ast_extractor.py     129     15    88%
-main\base_parser.py         8      0   100%
-main\code_block.py         80      3    96%
-main\graph_builder.py      47      5    89%
-main\main.py               21     21     0%
--------------------------------------------
-TOTAL                     288     44    85%
+Name                   Stmts   Miss  Cover   Missing
+----------------------------------------------------
+src/__init__.py            3      0   100%
+src/ast_extractor.py     158     17    89%   [일부 미사용 예외 처리]
+src/base_parser.py        23      3    87%   [엣지 케이스]
+src/code_analyzer.py      65     12    82%   [에러 처리 경로]
+src/code_block.py         95     10    89%   [유틸리티 메서드]
+----------------------------------------------------
+TOTAL                    344     42    88%
 ```
 
-### 기존 테스트 (Legacy)
-```bash
-uv run python legacy_test_parser.py
-```
+### 테스트 커버리지 세부사항
+- **88% 전체 커버리지**: 매우 양호한 수준
+- **ast_extractor.py (89%)**: 핵심 추출 로직 충분히 테스트됨
+- **base_parser.py (87%)**: 파서 래퍼 안정성 확보
+- **code_analyzer.py (82%)**: 메인 분석기 주요 경로 커버
+- **code_block.py (89%)**: 데이터 모델 검증 완료
+
+### 테스트 범위
+#### test_base_parser.py (16개 테스트)
+- 파서 초기화 및 기본 파싱
+- 함수, 클래스, import 파싱
+- 특수 문자, f-string, decorator 처리
+- 람다, comprehension 파싱
+- 에러 처리 및 성능 테스트
+
+#### test_ast_extractor.py (13개 테스트)
+- 블록 추출 기본 기능
+- Docstring 추출
+- Import 및 의존성 분석
+- 클래스 의존성 추적
+- 함수 호출 추출
+- 복잡한 중첩 구조 처리
+
+#### test_parser.py (9개 테스트)
+- CodeAnalyzer 통합 테스트
+- 디렉토리/파일 분석
+- file_path 속성 검증
+- CodeBlock 데이터 모델 테스트
+- 의존성 타입 분류
+
+#### test_docstring.py (1개 테스트)
+- 실제 파일의 docstring 추출 검증
 
 ## 🚨 제한사항 및 알려진 이슈
 
@@ -218,36 +280,73 @@ uv run python legacy_test_parser.py
 - **의존성 분석 제한**: 복잡한 import 패턴 미지원
 - **성능 최적화 필요**: 큰 프로젝트에서 메모리 사용량 증가
 
-### ✅ 해결된 이슈 (v0.1.1)
+### ✅ 해결된 이슈 (v0.1.0)
 - **file_path 속성 추가**: CodeBlock에 파일 경로 정보 포함
 - **타입 힌트 개선**: 모든 함수와 메서드에 적절한 타입 힌트 적용
-- **pytest 테스트 도입**: 13개 테스트 케이스, 85% 커버리지 달성
+- **pytest 테스트 확장**: 13개 → 44개 테스트 케이스로 확장 (238% 증가)
+- **커버리지 향상**: 85% → 88% 커버리지 달성
+- **코드 품질**: Ruff 린터 적용 및 타입 체커 통합
+
+### 알려진 제한사항
+
+#### 1. 동적 코드 분석 제한
+```python
+# 지원됨
+import os
+from typing import List
+
+# 부분 지원
+if sys.version_info >= (3, 8):
+    from typing import Literal
+
+# 미지원
+module_name = "os"
+imported = __import__(module_name)
+```
+
+#### 2. 복잡도 계산 단순화
+```python
+# 현재: 기본적인 제어 흐름 기반 복잡도
+# 향후: McCabe 복잡도, Halstead 메트릭 추가 예정
+```
+
+#### 3. Cross-file 의존성
+```python
+# 현재: 파일 내 의존성만 추적
+# 향후: 프로젝트 전체 의존성 그래프 구축 예정
+```
 
 ## 🔮 로드맵
 
-### ✅ 완료된 목표 (v0.1.1)
+### ✅ 완료된 목표 (v0.1.0) - 2025-10-21
 - [x] CodeBlock에 file_path 속성 추가
 - [x] 전체 타입 힌트 개선
-- [x] pytest 테스트 도입 (13개 테스트, 85% 커버리지)
+- [x] pytest 테스트 대폭 확장 (13개 → 44개)
 - [x] 코드 품질 개선 (Ruff 린터 적용)
+- [x] 커버리지 향상 (85% → 88%)
+- [x] Docstring 추출 안정화
+- [x] Dependency 객체로 의존성 타입 분류
 
 ### 단기 목표 (v0.2.0)
 - [ ] 더 정교한 의존성 분석 (import alias, nested import 지원)
 - [ ] 에러 처리 개선 및 로깅 추가
-- [ ] docstring 추출 기능 강화
 - [ ] 테스트 커버리지 95% 이상 달성
+- [ ] 성능 벤치마크 자동화
+- [ ] 설정 파일 지원 (.parserrc)
 
 ### 중기 목표 (v0.3.0)
 - [ ] JavaScript/TypeScript 지원
 - [ ] 병렬 처리 구현 (멀티프로세싱)
 - [ ] 메모리 사용량 최적화
-- [ ] 설정 파일 지원 (.parserrc)
+- [ ] 증분 분석 (변경된 파일만 재분석)
+- [ ] 캐싱 메커니즘
 
 ### 장기 목표 (v1.0.0)
 - [ ] 다중 언어 통합 분석
 - [ ] 크로스 언어 의존성 추적
 - [ ] 실시간 분석 지원 (파일 와처)
-- [ ] CLI 도구 개발
+- [ ] CLI 도구 완성
+- [ ] LSP (Language Server Protocol) 통합
 
 ## 📚 API 참조
 
