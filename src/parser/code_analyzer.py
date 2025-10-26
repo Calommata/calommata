@@ -3,6 +3,8 @@
 import logging
 from pathlib import Path
 
+from src.parser.queries.python_queries import PYTHON_QUERIES
+
 from .base_parser import BaseParser
 from .ast_extractor import ASTExtractor
 from .code_block import CodeBlock
@@ -27,7 +29,7 @@ class CodeAnalyzer:
         """분석기 초기화"""
         try:
             self.parser = BaseParser(tslanguage.language())
-            self.extractor = ASTExtractor(self.parser.language)
+            self.extractor = ASTExtractor(self.parser.language, PYTHON_QUERIES)
             self.analyzed_blocks: list[CodeBlock] = []
             logger.info("CodeAnalyzer initialized successfully")
         except Exception as e:
