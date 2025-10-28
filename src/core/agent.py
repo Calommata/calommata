@@ -8,7 +8,7 @@ from typing import Any, Annotated, Sequence
 
 from pydantic import BaseModel, Field
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
@@ -19,12 +19,8 @@ from .retriever import CodeRetriever, CodeSearchResult
 logger = logging.getLogger(__name__)
 
 
+# TODO : State 모듈 분리
 class AgentState(BaseModel):
-    """Agent 상태 관리
-
-    LangGraph에서 사용하는 상태 객체
-    """
-
     messages: Annotated[Sequence[BaseMessage], add_messages] = Field(
         default_factory=list, description="대화 메시지 리스트"
     )
@@ -43,7 +39,6 @@ class AgentState(BaseModel):
 class CodeRAGAgent(BaseModel):
     """코드 검색 및 분석을 위한 RAG Agent
 
-    LangChain과 LangGraph를 사용하여 다음을 수행합니다:
     1. 사용자 쿼리를 임베딩으로 변환
     2. Neo4j에서 유사한 코드 검색
     3. 그래프 관계를 탐색하여 연관 코드 수집
@@ -182,6 +177,7 @@ class CodeRAGAgent(BaseModel):
         logger.info("답변 생성 단계")
 
         # 프롬프트 구성
+        # TODO : 프롬프트 개선 여지 매우매우 많음
         system_prompt = """당신은 코드 분석 전문가입니다.
 사용자의 질문에 대해 제공된 코드 컨텍스트를 분석하여 정확하고 유용한 답변을 제공하세요.
 
@@ -195,9 +191,8 @@ class CodeRAGAgent(BaseModel):
 
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", system_prompt),
-                (
-                    "human",
+                SystemMessage(system_prompt),
+                HumanMessage(
                     """**사용자 질문:**
 {query}
 
@@ -241,6 +236,7 @@ class CodeRAGAgent(BaseModel):
                 "messages": [AIMessage(content=error_message)],
             }
 
+    # TODO : 추후 비동기처리도 고려하면 좋을 것 같지만, MVP 단계에서는 동기처리로 충분할 듯 합니다.
     def query(
         self,
         user_query: str,
@@ -271,50 +267,12 @@ class CodeRAGAgent(BaseModel):
             final_state = self._graph.invoke(initial_state)
 
             answer = final_state.get("final_answer", "답변을 생성할 수 없습니다.")
-            logger.info(f"✅ 쿼리 처리 완료")
+            logger.info("✅ 쿼리 처리 완료")
 
             return answer
 
         except Exception as e:
             logger.error(f"❌ 쿼리 처리 실패: {e!r}")
-            return f"쿼리 처리 중 오류가 발생했습니다: {e!s}"
-
-    async def aquery(
-        self,
-        user_query: str,
-        conversation_history: list[BaseMessage] | None = None,
-    ) -> str:
-        """비동기 쿼리 처리
-
-        Args:
-            user_query: 사용자 질문
-            conversation_history: 이전 대화 내역 (선택적)
-
-        Returns:
-            AI Agent의 답변
-        """
-        logger.info(f"비동기 쿼리 처리 시작: {user_query}")
-
-        # 초기 상태 구성
-        messages = conversation_history or []
-        messages.append(HumanMessage(content=user_query))
-
-        initial_state = AgentState(
-            messages=messages,
-            query=user_query,
-        )
-
-        try:
-            # 비동기 그래프 실행
-            final_state = await self._graph.ainvoke(initial_state)
-
-            answer = final_state.get("final_answer", "답변을 생성할 수 없습니다.")
-            logger.info(f"✅ 비동기 쿼리 처리 완료")
-
-            return answer
-
-        except Exception as e:
-            logger.error(f"❌ 비동기 쿼리 처리 실패: {e!r}")
             return f"쿼리 처리 중 오류가 발생했습니다: {e!s}"
 
     def get_search_results(self, user_query: str) -> list[CodeSearchResult]:

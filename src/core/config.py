@@ -1,5 +1,3 @@
-"""설정 관리 모듈"""
-
 import os
 from typing import Any
 from pydantic import BaseModel, Field

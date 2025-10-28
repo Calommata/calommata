@@ -74,7 +74,6 @@ class CodeNode(BaseModel):
 
     # 코드 내용
     source_code: str = Field(default="", description="소스 코드")
-    docstring: str | None = Field(default=None, description="문서 문자열")
 
     # 메타데이터
     complexity: int = Field(default=0, description="복잡도 점수")
@@ -162,7 +161,6 @@ class CodeNode(BaseModel):
             "start_line": self.start_line,
             "end_line": self.end_line,
             "source_code": self.source_code,
-            "docstring": self.docstring,
             "complexity": self.complexity,
             "scope_level": self.scope_level,
             "parameters": self.parameters,

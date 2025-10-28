@@ -768,7 +768,7 @@ def test_complex_code_analysis():
                 # 상위 3개 결과 출력
                 for idx, result in enumerate(search_results[:3]):
                     result_type = (
-                        result.node_type.value
+                        result.node_type
                         if hasattr(result.node_type, "value")
                         else str(result.node_type)
                     )

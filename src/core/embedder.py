@@ -162,7 +162,6 @@ class CodeEmbedder(BaseModel):
         임베딩 품질 향상을 위해 코드를 전처리합니다.
         - 과도한 공백 제거
         - 주석 보존 (중요한 컨텍스트)
-        - 너무 긴 코드 잘라내기
 
         Args:
             code: 원본 코드
@@ -190,14 +189,6 @@ class CodeEmbedder(BaseModel):
                 processed_lines.append(line)
 
         processed_code = "\n".join(processed_lines)
-
-        # 최대 길이 제한 (모델마다 다르지만 일반적으로 512 토큰)
-        # 약 2000자로 제한 (토큰은 보통 문자보다 작음)
-        max_length = 2000
-        if len(processed_code) > max_length:
-            processed_code = processed_code[:max_length] + "\n# ... (truncated)"
-            logger.debug(f"코드가 너무 길어 잘라냈습니다: {len(code)} -> {max_length}")
-
         return processed_code
 
     def get_embedding_dimension(self) -> int:

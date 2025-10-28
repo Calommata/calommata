@@ -7,7 +7,7 @@ from src.graph import Neo4jPersistence
 from src.core.config import CoreConfig
 from src.core.embedder import CodeEmbedder
 from src.core.retriever import CodeRetriever
-from src.core.graph_service import GraphService
+from src.core.graph_service import CodeGraphService
 from src.core.agent import CodeRAGAgent
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ def create_from_config(
     Neo4jPersistence,
     CodeEmbedder,
     CodeRetriever,
-    GraphService,
+    CodeGraphService,
     CodeRAGAgent,
 ]:
     """설정에서 모든 컴포넌트 생성
@@ -66,7 +66,7 @@ def create_from_config(
     logger.info("✅ 리트리버 초기화 완료")
 
     # 4. 그래프 서비스
-    graph_service = GraphService(
+    graph_service = CodeGraphService(
         persistence=persistence,
         embedder=embedder,
         project_name=config.project_name,
@@ -87,31 +87,3 @@ def create_from_config(
     logger.info("모든 컴포넌트 초기화 완료!")
 
     return persistence, embedder, retriever, graph_service, agent
-
-
-def create_agent_only(
-    embedder: CodeEmbedder,
-    retriever: CodeRetriever,
-    llm_api_key: str,
-    model_name: str = "gemini-2.5-flash",
-    temperature: float = 0.1,
-) -> CodeRAGAgent:
-    """Agent만 생성
-
-    Args:
-        embedder: 임베딩 모델
-        retriever: 리트리버
-        llm_api_key: LLM API 키
-        model_name: LLM 모델 이름
-        temperature: LLM 온도
-
-    Returns:
-        CodeRAGAgent
-    """
-    return CodeRAGAgent(
-        embedder=embedder,
-        retriever=retriever,
-        llm_api_key=llm_api_key,
-        model_name=model_name,
-        temperature=temperature,
-    )
