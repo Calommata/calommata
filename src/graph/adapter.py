@@ -1,27 +1,15 @@
-"""간소화된 Parser-to-Graph 어댑터
-
-단일 책임 원칙을 적용하여 변환 작업을 전문 클래스들에 위임합니다.
-"""
-
 import logging
 from typing import Any
 
-from .models import CodeGraph
-from .node_converter import NodeConverter
-from .relationship_builder import RelationshipBuilder
-from .statistics_updater import GraphStatisticsUpdater
+from src.graph.db import CodeGraph
+from src.graph.node.node_converter import NodeConverter
+from src.graph.relation.builder import RelationshipBuilder
+from src.graph.stat.statistics_updater import GraphStatisticsUpdater
 
 logger = logging.getLogger(__name__)
 
 
 class ParserToGraphAdapter:
-    """Parser 결과를 Graph 모델로 변환하는 간소화된 어댑터
-
-    실제 변환 작업은 전문 클래스들에 위임:
-    - NodeConverter: 노드 변환
-    - RelationshipBuilder: 관계 생성
-    """
-
     def __init__(self):
         self.node_converter = NodeConverter()
         self.relationship_builder = RelationshipBuilder()

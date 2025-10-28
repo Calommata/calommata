@@ -8,7 +8,7 @@ from typing import Any
 
 from neo4j import Driver
 
-from .queries import Neo4jQueries
+from src.graph.db import Neo4jQueries
 
 logger = logging.getLogger(__name__)
 

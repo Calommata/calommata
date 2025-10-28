@@ -1,24 +1,21 @@
 from .adapter import ParserToGraphAdapter
-from .dependency_relation_builder import DependencyRelationBuilder
-from .dict_relation_builder import DictRelationBuilder
-from .node_converter import NodeConverter
-from .relationship_builder import RelationshipBuilder
-from .statistics_updater import GraphStatisticsUpdater
-from .structural_relation_builder import StructuralRelationBuilder
-from .connection_manager import ConnectionManager
-from .node_persistence import NodePersistence
-from .relationship_persistence import RelationshipPersistence
 from .vector_search_manager import VectorSearchManager
-from .statistics_manager import StatisticsManager
-from .exceptions import (
-    ConnectionError,
-    IndexCreationError,
-    InvalidDataError,
-    NodeNotFoundError,
-    PersistenceError,
-    QueryExecutionError,
+from .relation.builder import (
+    DependencyRelationBuilder,
+    DictRelationBuilder,
+    StructuralRelationBuilder,
+    RelationshipBuilder,
 )
-from .models import (
+from .relation.relationship_persistence import RelationshipPersistence
+from .node.node_converter import NodeConverter
+from .node.node_persistence import NodePersistence
+from .node.error import NodeNotFoundError
+from .stat.statistics_updater import GraphStatisticsUpdater
+from .stat.statistics_manager import StatisticsManager
+from .db import (
+    Neo4jQueries,
+    Neo4jPersistence,
+    ConnectionManager,
     CodeGraph,
     CodeNode,
     CodeRelation,
@@ -26,8 +23,13 @@ from .models import (
     NodeType,
     RelationType,
 )
-from .persistence import Neo4jPersistence
-from .queries import Neo4jQueries
+from .db.error import (
+    ConnectionError,
+    IndexCreationError,
+    InvalidDataError,
+    PersistenceError,
+    QueryExecutionError,
+)
 from .utils import GraphAnalyzer, GraphExporter, GraphValidator
 
 

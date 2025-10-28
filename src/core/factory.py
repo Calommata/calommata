@@ -5,9 +5,9 @@ import logging
 from src.graph import Neo4jPersistence
 
 from src.core.config import CoreConfig
-from src.core.embedder import CodeEmbedder
-from src.core.retriever import CodeRetriever
-from src.core.graph_service import CodeGraphService
+from src.core.embedding.code_embedder import CodeEmbedder
+from src.core.code_retriever import CodeRetriever
+from src.core.graph import CodeGraphService
 from src.core.agent import CodeRAGAgent
 
 logger = logging.getLogger(__name__)
