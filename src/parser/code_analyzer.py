@@ -5,7 +5,7 @@ from src.parser.queries import PYTHON_QUERIES
 
 from .base_parser import BaseParser
 from .ast_extractor import ASTExtractor
-from .code_block import CodeBlock
+from .code_block import CodeBlock, BlockType
 import tree_sitter_python
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ class CodeASTAnalyzer:
             # 파일명과 파일 경로를 블록에 설정
             for block in blocks:
                 block.file_path = file_path_abs
-                if block.block_type == "module":
+                if block.block_type == BlockType.MODULE:
                     block.name = file_name
 
             self.analyzed_blocks.extend(blocks)

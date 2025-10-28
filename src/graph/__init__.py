@@ -1,4 +1,6 @@
 from .adapter import ParserToGraphAdapter
+from .node_converter import NodeConverter
+from .relationship_builder import RelationshipBuilder
 from .exceptions import (
     ConnectionError,
     IndexCreationError,
@@ -28,6 +30,8 @@ __all__ = [
     "NodeType",
     "RelationType",
     "ParserToGraphAdapter",
+    "NodeConverter",
+    "RelationshipBuilder",
     "GraphValidator",
     "GraphExporter",
     "GraphAnalyzer",

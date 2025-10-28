@@ -73,8 +73,6 @@ class Neo4jQueries:
         SET n.name = node_data.name,
             n.type = node_data.type,
             n.file_path = node_data.file_path,
-            n.start_line = node_data.start_line,
-            n.end_line = node_data.end_line,
             n.source_code = node_data.source_code,
             n.complexity = node_data.complexity,
             n.scope_level = node_data.scope_level,
@@ -105,7 +103,6 @@ class Neo4jQueries:
         MATCH (to:CodeNode {{id: $to_id}})
         MERGE (from)-[r:{relation_type} {{
             weight: $weight,
-            line_number: $line_number,
             context: $context,
             created_at: $created_at
         }}]->(to)

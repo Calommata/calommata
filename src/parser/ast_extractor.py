@@ -4,7 +4,7 @@ import logging
 
 from tree_sitter import Language, Node, Query, QueryCursor, Tree
 
-from .code_block import CodeBlock
+from .code_block import CodeBlock, BlockType
 
 logger = logging.getLogger(__name__)
 
@@ -49,11 +49,8 @@ class ASTExtractor:
         module_block = self._create_module_block(source_code, file_path)
         blocks.append(module_block)
 
-        # 2. TSQuery를 사용하여 각 블록 타입별 추출
+        # 2. TSQuery를 사용하여 각 블록 타입별 추출 (의존성 포함)
         self._extract_blocks_by_query(tree, blocks, file_path)
-
-        # 3. 의존성 관계 분석
-        self._analyze_dependencies(tree, blocks)
 
         return blocks
 
@@ -108,28 +105,33 @@ class ASTExtractor:
     def _create_module_block(self, source_code: str, file_path: str = "") -> CodeBlock:
         """모듈 블록 생성"""
         return CodeBlock(
-            block_type="module",
+            block_type=BlockType.MODULE,
             name="module",
-            start_line=0,
-            end_line=len(source_code.split("\n")) - 1,
             file_path=file_path,
             parent=None,
             source_code=source_code,
         )
 
     def _find_parent_block(
-        self, line: int, blocks: list[CodeBlock]
+        self, blocks: list[CodeBlock], current_name: str = ""
     ) -> CodeBlock | None:
-        """특정 라인을 포함하는 가장 구체적인 부모 블록 찾기"""
-        candidates = [
-            b
-            for b in blocks
-            if b.start_line <= line <= b.end_line and b.block_type != "import"
-        ]
-        if not candidates:
-            return None
-        # 가장 작은 범위의 블록 반환 (함수 > 클래스 > 모듈)
-        return min(candidates, key=lambda b: b.end_line - b.start_line)
+        """부모 블록 찾기
+
+        단순화된 로직:
+        - 마지막에 추가된 CLASS 블록을 찾아서 부모로 사용 (method인 경우)
+        - 없으면 MODULE을 부모로 사용
+        """
+        # 역순으로 검색하여 가장 최근의 클래스 블록 찾기
+        for block in reversed(blocks):
+            if block.block_type == BlockType.CLASS:
+                return block
+
+        # 클래스가 없으면 모듈 블록 반환
+        for block in blocks:
+            if block.block_type == BlockType.MODULE:
+                return block
+
+        return None
 
     def _get_node_text(self, node: Node) -> str:
         """노드에서 텍스트 추출"""
@@ -163,18 +165,14 @@ class ASTExtractor:
         if not main_node or not import_node:
             return None
 
-        start_line = import_node.start_point[0]
-        end_line = import_node.end_point[0]
         source_code = self._get_node_text(import_node)
-        parent = self._find_parent_block(start_line, blocks)
+        parent = self._find_parent_block(blocks)
 
         block_name = f"import_{module_names[0]}" if module_names else "import_unknown"
 
         return CodeBlock(
-            block_type="import",
+            block_type=BlockType.IMPORT,
             name=block_name,
-            start_line=start_line,
-            end_line=end_line,
             file_path=file_path,
             parent=parent,
             source_code=source_code,
@@ -202,11 +200,9 @@ class ASTExtractor:
         if not class_def_node:
             return None
 
-        start_line = class_def_node.start_point[0]
-        end_line = class_def_node.end_point[0]
         source_code = self._get_node_text(class_def_node)
 
-        parent = self._find_parent_block(start_line, blocks)
+        parent = self._find_parent_block(blocks)
 
         # 상속 정보 추출
         dependencies = []
@@ -216,11 +212,13 @@ class ASTExtractor:
                 if superclass:
                     dependencies.append(f"inherits:{superclass}")
 
+        # 클래스 내부의 의존성 추출
+        class_dependencies = self._extract_dependencies_from_node(class_def_node)
+        dependencies.extend(class_dependencies)
+
         return CodeBlock(
-            block_type="class",
+            block_type=BlockType.CLASS,
             name=class_name,
-            start_line=start_line,
-            end_line=end_line,
             file_path=file_path,
             parent=parent,
             source_code=source_code,
@@ -248,132 +246,76 @@ class ASTExtractor:
         if not func_def_node:
             return None
 
-        start_line = func_def_node.start_point[0]
-        end_line = func_def_node.end_point[0]
         source_code = self._get_node_text(func_def_node)
 
-        parent = self._find_parent_block(start_line, blocks)
+        parent = self._find_parent_block(blocks)
+
+        # 함수 내부의 의존성 추출 (함수 호출, 변수 사용 등)
+        dependencies = self._extract_dependencies_from_node(func_def_node)
 
         return CodeBlock(
-            block_type="function",
+            block_type=BlockType.FUNCTION,
             name=func_name,
-            start_line=start_line,
-            end_line=end_line,
             file_path=file_path,
             parent=parent,
             source_code=source_code,
+            dependencies=dependencies,
         )
 
-    def _analyze_dependencies(self, tree: Tree, blocks: list[CodeBlock]) -> None:
-        """TSQuery를 사용하여 의존성 관계 분석"""
-        # 함수 호출 관계 분석
+    def _extract_dependencies_from_node(self, node: Node) -> list[str]:
+        """노드 내부에서 의존성 추출 (TSQuery 활용)
+
+        Args:
+            node: 분석할 AST 노드 (function_definition, class_definition 등)
+
+        Returns:
+            의존성 문자열 리스트
+        """
+        dependencies = []
+
+        # 1. 함수 호출 추출
         if "function_calls" in self.queries:
-            self._analyze_function_calls_with_query(tree, blocks)
+            query = self.queries["function_calls"]
+            cursor = QueryCursor(query)
+            matches = cursor.matches(node)
 
-        # 변수 사용 관계 분석
+            for pattern_index, captures in matches:
+                if "call.function" in captures:
+                    for call_node in captures["call.function"]:
+                        func_name = self._get_node_text(call_node)
+                        if func_name and f"calls:{func_name}" not in dependencies:
+                            dependencies.append(f"calls:{func_name}")
+
+                if "call.method" in captures:
+                    for method_node in captures["call.method"]:
+                        method_name = self._get_node_text(method_node)
+                        if method_name and f"calls:{method_name}" not in dependencies:
+                            dependencies.append(f"calls:{method_name}")
+
+        # 2. 변수 정의 추출
         if "variable_usage" in self.queries:
-            self._analyze_variable_usage_with_query(tree, blocks)
+            query = self.queries["variable_usage"]
+            cursor = QueryCursor(query)
+            matches = cursor.matches(node)
 
-        # 타입 힌트 관계 분석
+            for pattern_index, captures in matches:
+                if "variable.name" in captures:
+                    for var_node in captures["variable.name"]:
+                        var_name = self._get_node_text(var_node)
+                        if var_name and f"defines:{var_name}" not in dependencies:
+                            dependencies.append(f"defines:{var_name}")
+
+        # 3. 타입 힌트 추출
         if "type_hints" in self.queries:
-            self._analyze_type_hints_with_query(tree, blocks)
+            query = self.queries["type_hints"]
+            cursor = QueryCursor(query)
+            matches = cursor.matches(node)
 
-    def _analyze_function_calls_with_query(
-        self, tree: Tree, blocks: list[CodeBlock]
-    ) -> None:
-        """TSQuery를 사용하여 함수 호출 관계 분석"""
-        query = self.queries["function_calls"]
-        cursor = QueryCursor(query)
-        matches = cursor.matches(tree.root_node)
+            for pattern_index, captures in matches:
+                if "type.name" in captures:
+                    for type_node in captures["type.name"]:
+                        type_name = self._get_node_text(type_node)
+                        if type_name and f"type:{type_name}" not in dependencies:
+                            dependencies.append(f"type:{type_name}")
 
-        for pattern_index, captures in matches:
-            if "call.function" in captures and captures["call.function"]:
-                call_node = captures["call.function"][0]
-                call_line = call_node.start_point[0]
-
-                # 호출하는 블록 찾기
-                caller_block = self._find_containing_block(call_line, blocks)
-                if not caller_block:
-                    continue
-
-                # 호출되는 함수명 추출
-                called_func = self._get_node_text(call_node)
-
-                if called_func and caller_block.dependencies is not None:
-                    if called_func not in caller_block.dependencies:
-                        caller_block.dependencies.append(called_func)
-
-            # 메서드 호출도 처리
-            if "call.method" in captures and captures["call.method"]:
-                method_node = captures["call.method"][0]
-                method_line = method_node.start_point[0]
-
-                caller_block = self._find_containing_block(method_line, blocks)
-                if not caller_block:
-                    continue
-
-                method_name = self._get_node_text(method_node)
-
-                if method_name and caller_block.dependencies is not None:
-                    if method_name not in caller_block.dependencies:
-                        caller_block.dependencies.append(method_name)
-
-    def _analyze_variable_usage_with_query(
-        self, tree: Tree, blocks: list[CodeBlock]
-    ) -> None:
-        """TSQuery를 사용하여 변수 사용 관계 분석"""
-        query = self.queries["variable_usage"]
-        cursor = QueryCursor(query)
-        matches = cursor.matches(tree.root_node)
-
-        for pattern_index, captures in matches:
-            if "variable.name" in captures and captures["variable.name"]:
-                var_node = captures["variable.name"][0]
-                var_line = var_node.start_point[0]
-
-                # 변수를 정의하는 블록 찾기
-                defining_block = self._find_containing_block(var_line, blocks)
-                if not defining_block:
-                    continue
-
-                # 변수명 추출
-                var_name = self._get_node_text(var_node)
-                if var_name and defining_block.dependencies is not None:
-                    dep_name = f"defines:{var_name}"
-                    if dep_name not in defining_block.dependencies:
-                        defining_block.dependencies.append(dep_name)
-
-    def _analyze_type_hints_with_query(
-        self, tree: Tree, blocks: list[CodeBlock]
-    ) -> None:
-        """TSQuery를 사용하여 타입 힌트 관계 분석"""
-        query = self.queries["type_hints"]
-        cursor = QueryCursor(query)
-        matches = cursor.matches(tree.root_node)
-
-        for pattern_index, captures in matches:
-            if "type.name" in captures and captures["type.name"]:
-                type_node = captures["type.name"][0]
-                type_line = type_node.start_point[0]
-
-                # 타입 힌트를 사용하는 블록 찾기
-                using_block = self._find_containing_block(type_line, blocks)
-                if not using_block:
-                    continue
-
-                # 타입명 추출
-                type_name = self._get_node_text(type_node)
-                if type_name and using_block.dependencies is not None:
-                    dep_name = f"type:{type_name}"
-                    if dep_name not in using_block.dependencies:
-                        using_block.dependencies.append(dep_name)
-
-    def _find_containing_block(
-        self, line: int, blocks: list[CodeBlock]
-    ) -> CodeBlock | None:
-        """특정 라인을 포함하는 가장 구체적인 블록 찾기"""
-        candidates = [b for b in blocks if b.start_line <= line <= b.end_line]
-        if not candidates:
-            return None
-        # 가장 작은 범위의 블록 반환 (함수 > 클래스 > 모듈)
-        return min(candidates, key=lambda b: b.end_line - b.start_line)
+        return dependencies

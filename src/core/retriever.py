@@ -9,6 +9,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from src.graph import Neo4jPersistence
+from .constants import DEFAULT_RELATED_NODES_LIMIT
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,7 @@ class CodeSearchResult(BaseModel):
 
         if self.related_nodes:
             context += "**Related Components:**\n"
-            # TODO : 5개가 적절한지 검토
-            for node in self.related_nodes[:5]:  # 최대 5개만
+            for node in self.related_nodes[:DEFAULT_RELATED_NODES_LIMIT]:
                 context += (
                     f"- {node.get('type', 'Unknown')}: {node.get('name', 'Unknown')}\n"
                 )

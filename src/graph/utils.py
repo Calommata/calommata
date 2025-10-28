@@ -78,13 +78,6 @@ class GraphValidator:
             if not node.file_path:
                 self.warnings.append(f"파일 경로가 비어있음: {node.id}")
 
-            # 라인 번호 유효성
-            if node.start_line > node.end_line:
-                self.errors.append(f"시작 라인이 종료 라인보다 큼: {node.id}")
-
-            if node.start_line < 0 or node.end_line < 0:
-                self.warnings.append(f"음수 라인 번호: {node.id}")
-
     def _validate_relations(self) -> None:
         """관계 유효성 검증"""
         for i, relation in enumerate(self.graph.relations):
@@ -116,16 +109,6 @@ class GraphValidator:
         if self.graph.total_files != actual_files:
             self.warnings.append(
                 f"파일 수 불일치: 통계={self.graph.total_files}, 실제={actual_files}"
-            )
-
-        # 라인 수 계산
-        actual_lines = sum(
-            max(node.end_line - node.start_line + 1, 0)
-            for node in self.graph.nodes.values()
-        )
-        if abs(self.graph.total_lines - actual_lines) > 10:  # 10라인 오차 허용
-            self.warnings.append(
-                f"라인 수 차이: 통계={self.graph.total_lines}, 계산={actual_lines}"
             )
 
     def _get_validation_statistics(self) -> dict[str, Any]:
@@ -184,12 +167,12 @@ class GraphExporter:
                 {
                     "id": node.id,
                     "name": node.name,
-                    "type": node.node_type
-                    if isinstance(node.node_type, str)
-                    else node.node_type.value,
+                    "type": (
+                        node.node_type.value
+                        if hasattr(node.node_type, "value")
+                        else node.node_type
+                    ),
                     "file_path": node.file_path,
-                    "start_line": node.start_line,
-                    "end_line": node.end_line,
                     "source_code": node.source_code,
                     "complexity": node.complexity,
                     "scope_level": node.scope_level,
@@ -201,7 +184,6 @@ class GraphExporter:
                         {
                             "target": dep.target,
                             "type": dep.dependency_type,
-                            "line_number": dep.line_number,
                             "context": dep.context,
                         }
                         for dep in node.dependencies
@@ -213,11 +195,12 @@ class GraphExporter:
                 {
                     "from": rel.from_node_id,
                     "to": rel.to_node_id,
-                    "type": rel.relation_type
-                    if isinstance(rel.relation_type, str)
-                    else rel.relation_type.value,
+                    "type": (
+                        rel.relation_type.value
+                        if hasattr(rel.relation_type, "value")
+                        else rel.relation_type
+                    ),
                     "weight": rel.weight,
-                    "line_number": rel.line_number,
                     "context": rel.context,
                     "created_at": rel.created_at.isoformat(),
                 }
@@ -255,12 +238,12 @@ class GraphExporter:
         # 노드 정의
         for node in self.graph.nodes.values():
             color = type_colors.get(node.node_type, "white")
-            node_type_value = (
-                node.node_type
-                if isinstance(node.node_type, str)
-                else node.node_type.value
+            node_type_str = (
+                node.node_type.value
+                if hasattr(node.node_type, "value")
+                else node.node_type
             )
-            label = f"{node.name}\\n({node_type_value})"
+            label = f"{node.name}\\n({node_type_str})"
             lines.append(f'  "{node.id}" [label="{label}", fillcolor="{color}"];')
 
         lines.append("")
@@ -268,14 +251,14 @@ class GraphExporter:
         # 관계 정의
         for rel in self.graph.relations:
             if not rel.to_node_id.startswith("external:"):
-                rel_type_value = (
-                    rel.relation_type
-                    if isinstance(rel.relation_type, str)
-                    else rel.relation_type.value
+                rel_type_str = (
+                    rel.relation_type.value
+                    if hasattr(rel.relation_type, "value")
+                    else rel.relation_type
                 )
                 lines.append(
                     f'  "{rel.from_node_id}" -> "{rel.to_node_id}" '
-                    f'[label="{rel_type_value}"];'
+                    f'[label="{rel_type_str}"];'
                 )
 
         lines.append("}")
@@ -380,9 +363,11 @@ class GraphAnalyzer:
             {
                 "node_id": node_id,
                 "name": data["node"].name,
-                "type": data["node"].node_type
-                if isinstance(data["node"].node_type, str)
-                else data["node"].node_type.value,
+                "type": (
+                    data["node"].node_type.value
+                    if hasattr(data["node"].node_type, "value")
+                    else data["node"].node_type
+                ),
                 "file_path": data["node"].file_path,
                 "incoming_connections": data["incoming"],
                 "outgoing_connections": data["outgoing"],
@@ -401,14 +386,10 @@ class GraphAnalyzer:
                 file_complexity[file_path] = {
                     "total_complexity": 0,
                     "node_count": 0,
-                    "total_lines": 0,
                 }
 
             file_complexity[file_path]["total_complexity"] += node.complexity
             file_complexity[file_path]["node_count"] += 1
-            file_complexity[file_path]["total_lines"] += (
-                node.end_line - node.start_line + 1
-            )
 
         # 평균 복잡도로 정렬
         ranked_files = []
@@ -424,7 +405,6 @@ class GraphAnalyzer:
                     "total_complexity": stats["total_complexity"],
                     "average_complexity": avg_complexity,
                     "node_count": stats["node_count"],
-                    "total_lines": stats["total_lines"],
                 }
             )
 

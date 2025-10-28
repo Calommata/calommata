@@ -346,11 +346,13 @@ class Neo4jPersistence:
             # 관계 타입별로 그룹화하여 배치 처리
             relations_by_type: dict[str, list[CodeRelation]] = {}
             for rel in relations:
-                rel_type = (
+                # relation_type이 이미 문자열이면 그대로, enum이면 .value 사용
+                rel_type_value = (
                     rel.relation_type.value
                     if hasattr(rel.relation_type, "value")
-                    else str(rel.relation_type)
+                    else rel.relation_type
                 )
+                rel_type = str(rel_type_value)  # 명시적으로 문자열로 변환
                 if rel_type not in relations_by_type:
                     relations_by_type[rel_type] = []
                 relations_by_type[rel_type].append(rel)
@@ -388,13 +390,11 @@ class Neo4jPersistence:
 
             with self.driver.session() as session:
                 for rel in batch:
-                    # 동적으로 생성된 쿼리이므로 타입 체크 무시
                     session.run(
                         query,  # type: ignore[arg-type]
                         from_id=rel.from_node_id,
                         to_id=rel.to_node_id,
                         weight=rel.weight,
-                        line_number=rel.line_number,
                         context=rel.context,
                         created_at=rel.created_at.isoformat(),
                     )

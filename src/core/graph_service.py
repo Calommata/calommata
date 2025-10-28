@@ -15,6 +15,7 @@ from src.graph import Neo4jPersistence
 from src.graph import CodeGraph
 
 from .embedder import CodeEmbedder
+from .constants import DEFAULT_EMBEDDING_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -132,9 +133,8 @@ class CodeGraphService(BaseModel):
         nodes = list(graph.nodes.values())
 
         # 배치로 처리
-        batch_size = 32
-        for i in range(0, len(nodes), batch_size):
-            batch = nodes[i : i + batch_size]
+        for i in range(0, len(nodes), DEFAULT_EMBEDDING_BATCH_SIZE):
+            batch = nodes[i : i + DEFAULT_EMBEDDING_BATCH_SIZE]
 
             # 코드 임베딩
             texts = []
@@ -151,7 +151,7 @@ class CodeGraphService(BaseModel):
                     node.embedding_model = self.embedder.model_name
 
                 logger.info(
-                    f"✅ 배치 {i // batch_size + 1} 임베딩 완료 ({len(batch)}개)"
+                    f"✅ 배치 {i // DEFAULT_EMBEDDING_BATCH_SIZE + 1} 임베딩 완료 ({len(batch)}개)"
                 )
 
             except Exception as e:

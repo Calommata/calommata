@@ -758,8 +758,53 @@ def test_complex_code_analysis():
                 # "사용자 권한 시스템은 어떻게 구현되어 있나요?",
             ]
 
+            # 임베딩 상태 확인
+            logger.info("\n=== 임베딩 상태 확인 ===")
+            with persistence.driver.session() as session:
+                result = session.run("MATCH (n:CodeNode) RETURN count(n) as count")
+                total = list(result)[0]["count"]
+                logger.info(f"전체 노드: {total}")
+
+                result = session.run(
+                    "MATCH (n:CodeNode) WHERE n.embedding IS NOT NULL RETURN count(n) as count"
+                )
+                embedded = list(result)[0]["count"]
+                logger.info(f"임베딩이 있는 노드: {embedded}")
+
+                result = session.run("""
+                    MATCH (n:CodeNode) 
+                    WHERE n.embedding IS NOT NULL
+                    RETURN n.name as name, n.type as type, size(n.embedding) as size, n.id as id
+                    LIMIT 5
+                """)
+                logger.info("샘플 임베딩:")
+                for record in result:
+                    logger.info(
+                        f"  - {record['name']} ({record['type']}): {record['size']}차원, ID={record['id'][:50]}"
+                    )
+
+                # 노드 타입 분포 확인
+                result = session.run("""
+                    MATCH (n:CodeNode)
+                    WHERE n.type IS NOT NULL
+                    RETURN n.type as type, count(n) as count
+                    ORDER BY count DESC
+                """)
+                logger.info("노드 타입 분포:")
+                for record in result:
+                    logger.info(f"  - {record['type']}: {record['count']}개")
+
+                # Module 타입 노드 제외 후 개수
+                result = session.run("""
+                    MATCH (n:CodeNode)
+                    WHERE n.embedding IS NOT NULL AND n.type <> 'Module'
+                    RETURN count(n) as count
+                """)
+                non_module_count = list(result)[0]["count"]
+                logger.info(f"Module 제외 임베딩 노드: {non_module_count}")
+
             for i, query in enumerate(test_queries, 1):
-                logger.info(f"\n=== 질의 {i}/5: {query} ===")
+                logger.info(f"\n=== 질의 {i}/1: {query} ===")
 
                 # 검색 단계 먼저 확인
                 search_results = agent.get_search_results(query)

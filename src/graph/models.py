@@ -52,7 +52,6 @@ class Dependency(BaseModel):
     dependency_type: str = Field(
         ..., description="의존성 타입 (import, call, inherit 등)"
     )
-    line_number: int | None = Field(default=None, description="의존성 발생 라인")
     context: str | None = Field(default=None, description="의존성 컨텍스트")
 
     def __str__(self) -> str:
@@ -69,8 +68,6 @@ class CodeNode(BaseModel):
 
     # 위치 정보
     file_path: str = Field(..., description="파일 경로")
-    start_line: int = Field(..., description="시작 라인")
-    end_line: int = Field(..., description="종료 라인")
 
     # 코드 내용
     source_code: str = Field(default="", description="소스 코드")
@@ -111,10 +108,11 @@ class CodeNode(BaseModel):
         Example:
             /path/to/file.py:Function:my_func
         """
+        # node_type이 이미 문자열이면 그대로, enum이면 .value 사용
         node_type_str = (
             self.node_type.value
-            if hasattr(self.node_type, "value")
-            else str(self.node_type)
+            if isinstance(self.node_type, NodeType)
+            else self.node_type
         )
         return f"{self.file_path}:{node_type_str}:{self.name}"
 
@@ -122,7 +120,6 @@ class CodeNode(BaseModel):
         self,
         target: str,
         dep_type: str,
-        line_number: int | None = None,
         context: str | None = None,
     ) -> None:
         """의존성 추가
@@ -130,13 +127,11 @@ class CodeNode(BaseModel):
         Args:
             target: 의존 대상 이름
             dep_type: 의존성 타입
-            line_number: 의존성 발생 라인 (선택사항)
             context: 의존성 컨텍스트 (선택사항)
         """
         dependency = Dependency(
             target=target,
             dependency_type=dep_type,
-            line_number=line_number,
             context=context,
         )
         self.dependencies.append(dependency)
@@ -148,18 +143,17 @@ class CodeNode(BaseModel):
 
     def to_neo4j_node(self) -> dict[str, Any]:
         """Neo4j 노드 생성을 위한 딕셔너리 변환"""
+        # node_type이 이미 문자열이면 그대로, enum이면 .value 사용
         node_type_str = (
             self.node_type.value
-            if hasattr(self.node_type, "value")
-            else str(self.node_type)
+            if isinstance(self.node_type, NodeType)
+            else self.node_type
         )
         return {
             "id": self.id,
             "name": self.name,
             "type": node_type_str,
             "file_path": self.file_path,
-            "start_line": self.start_line,
-            "end_line": self.end_line,
             "source_code": self.source_code,
             "complexity": self.complexity,
             "scope_level": self.scope_level,
@@ -171,7 +165,6 @@ class CodeNode(BaseModel):
             "embedding_model": self.embedding_model,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
-            # dependencies는 별도 관계로 처리
         }
 
 
@@ -185,7 +178,6 @@ class CodeRelation(BaseModel):
 
     # 관계 메타데이터
     weight: float = Field(default=1.0, description="관계 가중치")
-    line_number: int | None = Field(default=None, description="관계가 발생한 라인")
     context: str | None = Field(default=None, description="관계 컨텍스트")
 
     # 타임스탬프
@@ -195,15 +187,15 @@ class CodeRelation(BaseModel):
 
     def to_neo4j_relation(self) -> dict[str, Any]:
         """Neo4j 관계 생성을 위한 딕셔너리 변환"""
+        # relation_type이 이미 문자열이면 그대로, enum이면 .value 사용
         relation_type_str = (
             self.relation_type.value
-            if hasattr(self.relation_type, "value")
-            else str(self.relation_type)
+            if isinstance(self.relation_type, RelationType)
+            else self.relation_type
         )
         return {
             "type": relation_type_str,
             "weight": self.weight,
-            "line_number": self.line_number,
             "context": self.context,
             "created_at": self.created_at.isoformat(),
         }
@@ -264,41 +256,11 @@ class CodeGraph(BaseModel):
 
     def get_nodes_by_type(self, node_type: NodeType) -> list[CodeNode]:
         """타입별 노드 조회"""
-        # 문자열 비교로 변경 (enum이 문자열로 저장되는 경우 대응)
-        target_type = node_type.value if hasattr(node_type, "value") else str(node_type)
-        return [
-            node
-            for node in self.nodes.values()
-            if (
-                node.node_type == node_type
-                or str(node.node_type) == target_type
-                or (
-                    hasattr(node.node_type, "value")
-                    and node.node_type.value == target_type
-                )
-            )
-        ]
+        return [node for node in self.nodes.values() if node.node_type == node_type]
 
     def get_relations_by_type(self, relation_type: RelationType) -> list[CodeRelation]:
         """타입별 관계 조회"""
-        # 문자열 비교로 변경 (enum이 문자열로 저장되는 경우 대응)
-        target_type = (
-            relation_type.value
-            if hasattr(relation_type, "value")
-            else str(relation_type)
-        )
-        return [
-            r
-            for r in self.relations
-            if (
-                r.relation_type == relation_type
-                or str(r.relation_type) == target_type
-                or (
-                    hasattr(r.relation_type, "value")
-                    and r.relation_type.value == target_type
-                )
-            )
-        ]
+        return [r for r in self.relations if r.relation_type == relation_type]
 
     def get_statistics(self) -> dict[str, Any]:
         """그래프 통계 정보"""
