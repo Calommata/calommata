@@ -7,7 +7,7 @@ import logging
 from typing import Any, Annotated, Sequence
 
 from pydantic import BaseModel, Field
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, END
@@ -19,6 +19,7 @@ from .retriever import CodeRetriever, CodeSearchResult
 logger = logging.getLogger(__name__)
 
 
+# TODO : State 모듈 분리
 class AgentState(BaseModel):
     messages: Annotated[Sequence[BaseMessage], add_messages] = Field(
         default_factory=list, description="대화 메시지 리스트"
@@ -176,6 +177,7 @@ class CodeRAGAgent(BaseModel):
         logger.info("답변 생성 단계")
 
         # 프롬프트 구성
+        # TODO : 프롬프트 개선 여지 매우매우 많음
         system_prompt = """당신은 코드 분석 전문가입니다.
 사용자의 질문에 대해 제공된 코드 컨텍스트를 분석하여 정확하고 유용한 답변을 제공하세요.
 
@@ -189,9 +191,8 @@ class CodeRAGAgent(BaseModel):
 
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", system_prompt),
-                (
-                    "human",
+                SystemMessage(system_prompt),
+                HumanMessage(
                     """**사용자 질문:**
 {query}
 
