@@ -709,9 +709,9 @@ def test_complex_code_analysis():
         return
 
     config.llm.api_key = api_key
-    config.llm.model_name = "gemini-2.5-flash"  # 더 많은 요청 가능
-    config.llm.temperature = 0.7
-    config.llm.max_tokens = 4096  # 더 긴 응답 허용 (늘림)
+    config.llm.model_name = "gemini-2.0-flash"
+    config.llm.temperature = 0.6
+    config.llm.max_tokens = 2048
 
     # 컴포넌트 초기화
     persistence, embedder, retriever, graph_service, agent = create_from_config(config)

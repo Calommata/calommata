@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from src.core.code_retriever import CodeSearchResult
 from src.core.constants.search import DEFAULT_RELATED_NODES_LIMIT
 
 logger = logging.getLogger(__name__)
@@ -56,11 +57,14 @@ class ContextOptimizer:
             "truncated_line_count": len(truncated_code.split("\n")),
         }
 
-    def format_search_result_compact(self, result: Any) -> str:
+    def format_search_result_compact(
+        self, result: CodeSearchResult, result_index: int = 1
+    ) -> str:
         """검색 결과를 압축된 형태로 포맷팅
 
         Args:
             result: CodeSearchResult 객체
+            result_index: 결과 순서 (1~3은 상세, 4~5는 간략)
 
         Returns:
             압축된 컨텍스트 문자열
@@ -70,18 +74,23 @@ class ContextOptimizer:
 
         # 기본 정보
         context = f"### {result.node_type}: `{result.name}`\n"
-        context += f"**File:** `{result.file_path}`\n"
-        context += f"**Similarity:** {result.similarity_score:.1%}\n\n"  # 요약 (코드가 잘린 경우)
-        if optimized["is_truncated"]:
+        context += f"**File:** `{result.file_path}` | **Similarity:** {result.similarity_score:.1%}\n\n"
+
+        # 코드 (상위 결과는 상세, 하위는 요약만)
+        if result_index <= 3:
+            if optimized["is_truncated"]:
+                context += f"**Summary:** {optimized['summary']}\n"
+                context += f"*(Showing {optimized['truncated_line_count']} of {optimized['original_line_count']} lines)*\n\n"
+            context += f"```python\n{optimized['code']}\n```\n\n"
+        else:
+            # 낮은 유사도 결과는 요약만
             context += f"**Summary:** {optimized['summary']}\n"
-            context += f"*(Showing {optimized['truncated_line_count']} of {optimized['original_line_count']} lines)*\n\n"
+            if optimized["is_truncated"]:
+                context += f"*(Full code: {optimized['original_line_count']} lines)*\n"
 
-        # 코드 (압축됨)
-        context += f"```python\n{optimized['code']}\n```\n\n"
-
-        # 관련 컴포넌트 (제한적으로)
-        if result.related_nodes:
-            context += "**Related:** "
+        # 관련 컴포넌트 (최상위 결과만, 중복 제거)
+        if result_index == 1 and result.related_nodes:
+            context += "\n**Related Components:** "
             related_names = [
                 f"{node.get('type', '?')}:`{node.get('name', '?')}`"
                 for node in result.related_nodes[: self.related_nodes_limit]
@@ -92,7 +101,7 @@ class ContextOptimizer:
 
     def build_optimized_context(
         self,
-        search_results: list[Any],
+        search_results: list[CodeSearchResult],
         max_results: int = 3,
     ) -> str:
         """최적화된 전체 컨텍스트 생성
@@ -116,7 +125,7 @@ class ContextOptimizer:
         total_length = 0
 
         for i, result in enumerate(sorted_results[:max_results], 1):
-            result_context = self.format_search_result_compact(result)
+            result_context = self.format_search_result_compact(result, result_index=i)
 
             # 길이 체크
             if total_length + len(result_context) > self.max_total_context:
