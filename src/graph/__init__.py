@@ -1,13 +1,21 @@
 from .adapter import ParserToGraphAdapter
-from .exceptions import (
-    ConnectionError,
-    IndexCreationError,
-    InvalidDataError,
-    NodeNotFoundError,
-    PersistenceError,
-    QueryExecutionError,
+from .vector_search_manager import VectorSearchManager
+from .relation.builder import (
+    DependencyRelationBuilder,
+    DictRelationBuilder,
+    StructuralRelationBuilder,
+    RelationshipBuilder,
 )
-from .models import (
+from .relation.relationship_persistence import RelationshipPersistence
+from .node.node_converter import NodeConverter
+from .node.node_persistence import NodePersistence
+from .node.error import NodeNotFoundError
+from .stat.statistics_updater import GraphStatisticsUpdater
+from .stat.statistics_manager import StatisticsManager
+from .db import (
+    Neo4jQueries,
+    Neo4jPersistence,
+    ConnectionManager,
     CodeGraph,
     CodeNode,
     CodeRelation,
@@ -15,8 +23,13 @@ from .models import (
     NodeType,
     RelationType,
 )
-from .persistence import Neo4jPersistence
-from .queries import Neo4jQueries
+from .db.error import (
+    ConnectionError,
+    IndexCreationError,
+    InvalidDataError,
+    PersistenceError,
+    QueryExecutionError,
+)
 from .utils import GraphAnalyzer, GraphExporter, GraphValidator
 
 
@@ -28,10 +41,21 @@ __all__ = [
     "NodeType",
     "RelationType",
     "ParserToGraphAdapter",
+    "NodeConverter",
+    "RelationshipBuilder",
+    "DependencyRelationBuilder",
+    "DictRelationBuilder",
+    "StructuralRelationBuilder",
+    "GraphStatisticsUpdater",
     "GraphValidator",
     "GraphExporter",
     "GraphAnalyzer",
     "Neo4jPersistence",
+    "ConnectionManager",
+    "NodePersistence",
+    "RelationshipPersistence",
+    "VectorSearchManager",
+    "StatisticsManager",
     "Neo4jQueries",
     "PersistenceError",
     "ConnectionError",

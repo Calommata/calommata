@@ -1,13 +1,11 @@
-"""간편한 초기화를 위한 팩토리 함수들"""
-
 import logging
 
 from src.graph import Neo4jPersistence
 
 from src.core.config import CoreConfig
-from src.core.embedder import CodeEmbedder
-from src.core.retriever import CodeRetriever
-from src.core.graph_service import CodeGraphService
+from src.core.embedding.code_embedder import CodeEmbedder
+from src.core.code_retriever import CodeRetriever
+from src.core.graph import CodeGraphService
 from src.core.agent import CodeRAGAgent
 
 logger = logging.getLogger(__name__)
