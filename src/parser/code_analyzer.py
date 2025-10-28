@@ -3,9 +3,10 @@ from pathlib import Path
 
 from src.parser.queries import PYTHON_QUERIES
 
-from .base_parser import BaseParser
 from .ast_extractor import ASTExtractor
+from .base_parser import BaseParser
 from .code_block import CodeBlock, BlockType
+from .file_reader import FileReader
 import tree_sitter_python
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ class CodeASTAnalyzer:
         """분석기 초기화"""
         self.parser = BaseParser(tree_sitter_python.language())
         self.extractor = ASTExtractor(self.parser.language, PYTHON_QUERIES)
+        self.file_reader = FileReader()
         self.analyzed_blocks: list[CodeBlock] = []
 
     def analyze_file(self, file_path: str) -> list[CodeBlock]:
@@ -45,7 +47,7 @@ class CodeASTAnalyzer:
         logger.info(f"Analyzing file: {file_path}")
 
         try:
-            source_code = self._read_file(file_path)
+            source_code = self.file_reader.read_file(file_path)
             tree = self.parser.parse_code(source_code)
             blocks = self.extractor.extract_blocks(tree, source_code, file_path)
 
@@ -69,24 +71,13 @@ class CodeASTAnalyzer:
             logger.error(f"Error analyzing {file_path}: {e}")
             raise
 
-    def _read_file(self, file_path: str) -> str:
-        """파일 읽기
-
-        Args:
-            file_path: 읽을 파일 경로
+    def get_all_blocks(self) -> list[CodeBlock]:
+        """분석된 모든 블록 반환
 
         Returns:
-            파일의 내용
-
-        Raises:
-            FileNotFoundError: 파일이 없는 경우
+            지금까지 분석된 모든 CodeBlock들의 리스트
         """
-        path = Path(file_path)
-        if not path.exists():
-            raise FileNotFoundError(f"File not found: {file_path}")
-
-        with open(file_path, "r", encoding="utf-8") as f:
-            return f.read()
+        return self.analyzed_blocks
 
     def analyze_directory(self, dir_path: str) -> list[CodeBlock]:
         """디렉토리 내 모든 Python 파일 분석
@@ -100,7 +91,7 @@ class CodeASTAnalyzer:
             추출된 모든 CodeBlock들의 리스트
         """
         logger.info(f"Analyzing directory: {dir_path}")
-        python_files = self._find_python_files(dir_path)
+        python_files = self.file_reader.find_python_files(dir_path)
         all_blocks: list[CodeBlock] = []
 
         logger.debug(f"Found {len(python_files)} Python files")
@@ -114,27 +105,3 @@ class CodeASTAnalyzer:
 
         logger.info(f"Analysis complete. Total blocks: {len(all_blocks)}")
         return all_blocks
-
-    def _find_python_files(self, dir_path: str) -> list[Path]:
-        """디렉토리에서 Python 파일들 찾기
-
-        Args:
-            dir_path: 검색할 디렉토리 경로
-
-        Returns:
-            발견된 Python 파일들의 Path 객체 리스트
-        """
-        path = Path(dir_path)
-        if not path.exists():
-            logger.warning(f"Directory not found: {dir_path}")
-            return []
-
-        return list(path.glob("**/*.py"))
-
-    def get_all_blocks(self) -> list[CodeBlock]:
-        """분석된 모든 블록 반환
-
-        Returns:
-            지금까지 분석된 모든 CodeBlock들의 리스트
-        """
-        return self.analyzed_blocks
