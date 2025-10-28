@@ -382,7 +382,7 @@ def create_complex_project(base_path: Path) -> None:
         
         def validate_email(email: str) -> bool:
             '''이메일 형식 검증'''
-            pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'
             return bool(re.match(pattern, email))
         
         
@@ -463,7 +463,7 @@ def create_complex_project(base_path: Path) -> None:
                     return ""
                 
                 # 소문자 변환, 공백 정리
-                normalized = re.sub(r'\s+', ' ', text.lower().strip())
+                normalized = re.sub(r'\\s+', ' ', text.lower().strip())
                 return normalized
             
             @staticmethod

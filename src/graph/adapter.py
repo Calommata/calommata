@@ -9,6 +9,7 @@ from typing import Any
 from .models import CodeGraph
 from .node_converter import NodeConverter
 from .relationship_builder import RelationshipBuilder
+from .statistics_updater import GraphStatisticsUpdater
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,7 @@ class ParserToGraphAdapter:
         )
 
         # 4단계: 통계 업데이트
-        self._update_graph_statistics(graph)
+        GraphStatisticsUpdater.update_statistics(graph)
 
         logger.info(
             f"✅ Graph 변환 완료: {len(graph.nodes)}개 노드, "
@@ -132,34 +133,10 @@ class ParserToGraphAdapter:
                     continue
 
         # 3단계: 통계 업데이트
-        self._update_graph_statistics(graph)
+        GraphStatisticsUpdater.update_statistics(graph)
 
         logger.info(
             f"✅ Graph 변환 완료: {len(graph.nodes)}개 노드, "
             f"{len(graph.relations)}개 관계"
         )
         return graph
-
-    def _update_graph_statistics(self, graph: CodeGraph) -> None:
-        """그래프 통계 정보 업데이트
-
-        Args:
-            graph: 업데이트할 CodeGraph
-        """
-        if not graph.nodes:
-            return
-
-        # 파일 수 계산
-        file_paths = {node.file_path for node in graph.nodes.values()}
-        graph.total_files = len(file_paths)
-
-        # 총 라인 수는 소스 코드의 줄 수로 계산
-        total_lines = sum(
-            len(node.source_code.splitlines()) if node.source_code else 0
-            for node in graph.nodes.values()
-        )
-        graph.total_lines = total_lines
-
-        logger.debug(
-            f"통계 업데이트: {graph.total_files}개 파일, {graph.total_lines}줄"
-        )
