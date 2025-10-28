@@ -67,8 +67,6 @@ DEFAULT_CALC = create_calculator()
             print(f"  Import: {block.imports}")
         if block.dependencies:
             print(f"  의존성: {block.dependencies}")
-        if block.docstring:
-            print(f"  문서: {block.docstring}")
 
 
 if __name__ == "__main__":

@@ -1,19 +1,17 @@
-"""CodeAnalyzer - 코드 분석 엔진"""
-
 import logging
 from pathlib import Path
 
-from src.parser.queries.python_queries import PYTHON_QUERIES
+from src.parser.queries import PYTHON_QUERIES
 
 from .base_parser import BaseParser
 from .ast_extractor import ASTExtractor
 from .code_block import CodeBlock
-import tree_sitter_python as tslanguage
+import tree_sitter_python
 
 logger = logging.getLogger(__name__)
 
 
-class CodeAnalyzer:
+class CodeASTAnalyzer:
     """코드 분석기 - Tree-sitter를 사용하여 코드 블록 추출
 
     디렉토리 또는 파일 내의 Python 코드를 분석하여
@@ -27,14 +25,9 @@ class CodeAnalyzer:
 
     def __init__(self) -> None:
         """분석기 초기화"""
-        try:
-            self.parser = BaseParser(tslanguage.language())
-            self.extractor = ASTExtractor(self.parser.language, PYTHON_QUERIES)
-            self.analyzed_blocks: list[CodeBlock] = []
-            logger.info("CodeAnalyzer initialized successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize CodeAnalyzer: {e}")
-            raise
+        self.parser = BaseParser(tree_sitter_python.language())
+        self.extractor = ASTExtractor(self.parser.language, PYTHON_QUERIES)
+        self.analyzed_blocks: list[CodeBlock] = []
 
     def analyze_file(self, file_path: str) -> list[CodeBlock]:
         """단일 파일 분석

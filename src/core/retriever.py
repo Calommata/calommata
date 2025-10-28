@@ -21,7 +21,6 @@ class CodeSearchResult(BaseModel):
     node_type: str = Field(..., description="노드 타입 (Function, Class, etc.)")
     file_path: str = Field(..., description="파일 경로")
     source_code: str = Field(..., description="소스 코드")
-    docstring: str | None = Field(None, description="문서 문자열")
     similarity_score: float = Field(..., description="유사도 점수 (0-1)")
 
     # 컨텍스트 정보
@@ -41,14 +40,11 @@ class CodeSearchResult(BaseModel):
         context = f"### {self.node_type}: {self.name}\n"
         context += f"File: {self.file_path}\n"
         context += f"Similarity: {self.similarity_score:.2f}\n\n"
-
-        if self.docstring:
-            context += f"**Documentation:**\n{self.docstring}\n\n"
-
         context += f"**Code:**\n```python\n{self.source_code}\n```\n\n"
 
         if self.related_nodes:
             context += "**Related Components:**\n"
+            # TODO : 5개가 적절한지 검토
             for node in self.related_nodes[:5]:  # 최대 5개만
                 context += (
                     f"- {node.get('type', 'Unknown')}: {node.get('name', 'Unknown')}\n"
@@ -147,42 +143,33 @@ class CodeRetriever(BaseModel):
     def search_by_type(
         self,
         node_type: str,
-        query_embedding: list[float] | None = None,
+        query_embedding: list[float],
         limit: int | None = None,
     ) -> list[CodeSearchResult]:
         """노드 타입별 검색
 
         Args:
             node_type: 노드 타입 (Function, Class, etc.)
-            query_embedding: 쿼리 임베딩 (None이면 타입만으로 검색)
+            query_embedding: 쿼리 임베딩
             limit: 최대 결과 수
 
         Returns:
             검색 결과 리스트
         """
-        # 일단 모든 유사 코드 검색
-        if query_embedding:
-            results = self.search_similar_code(
-                query_embedding=query_embedding,
-                limit=limit or self.max_results * 2,  # 필터링을 위해 더 많이 가져옴
-            )
+        results = self.search_similar_code(
+            query_embedding=query_embedding,
+            limit=limit or self.max_results * 2,  # 필터링을 위해 더 많이 가져옴
+        )
 
-            # 타입으로 필터링
-            filtered_results = [
-                result
-                for result in results
-                if result.node_type.lower() == node_type.lower()
-            ]
+        # 타입으로 필터링
+        filtered_results = [
+            result
+            for result in results
+            if result.node_type.lower() == node_type.lower()
+        ]
 
-            # limit 적용
-            return filtered_results[: limit or self.max_results]
-
-        else:
-            # 타입만으로 검색 (임베딩 없음)
-            logger.warning(
-                "임베딩 없이 타입만으로 검색하는 기능은 아직 구현되지 않았습니다"
-            )
-            return []
+        # limit 적용
+        return filtered_results[: limit or self.max_results]
 
     def get_related_code(
         self,
@@ -229,7 +216,6 @@ class CodeRetriever(BaseModel):
                     node_type=node.get("type", ""),
                     file_path=node.get("file_path", ""),
                     source_code=node.get("source_code", ""),
-                    docstring=node.get("docstring"),
                     similarity_score=1.0,  # 그래프 관계 기반이므로 1.0
                     related_nodes=[],
                     relationships=[],
@@ -263,91 +249,7 @@ class CodeRetriever(BaseModel):
             node_type=result["type"],
             file_path=result["file_path"],
             source_code=result["source_code"],
-            docstring=result.get("docstring"),
             similarity_score=result["score"],
             related_nodes=context.get("related_nodes", []),
             relationships=context.get("relationships", []),
         )
-
-    def search_with_hybrid_approach(
-        self,
-        query_embedding: list[float],
-        query_text: str,
-        vector_weight: float = 0.7,
-        graph_weight: float = 0.3,
-    ) -> list[CodeSearchResult]:
-        """하이브리드 검색: 벡터 유사도 + 그래프 구조
-
-        Args:
-            query_embedding: 쿼리 임베딩 벡터
-            query_text: 쿼리 텍스트 (키워드 매칭용)
-            vector_weight: 벡터 유사도 가중치
-            graph_weight: 그래프 구조 가중치
-
-        Returns:
-            하이브리드 점수로 정렬된 검색 결과
-        """
-        try:
-            # 1. 벡터 유사도 검색
-            vector_results = self.search_similar_code(
-                query_embedding,
-                limit=self.max_results * 2,  # 더 많이 가져와서 재순위
-            )
-
-            # 2. 키워드 기반 텍스트 검색 결과도 포함
-            text_matched_results = self._search_by_text_similarity(query_text)
-
-            # 3. 하이브리드 점수 계산
-            all_results = {}
-
-            # 벡터 검색 결과 추가
-            for result in vector_results:
-                all_results[result.node_id] = result
-                result.similarity_score = result.similarity_score * vector_weight
-
-            # 텍스트 검색 결과 추가/업데이트
-            for result in text_matched_results:
-                if result.node_id in all_results:
-                    # 기존 점수에 텍스트 점수 추가
-                    all_results[result.node_id].similarity_score += (
-                        result.similarity_score * graph_weight
-                    )
-                else:
-                    # 새로운 결과 추가
-                    result.similarity_score *= graph_weight
-                    all_results[result.node_id] = result
-
-            # 4. 최종 점수로 정렬
-            final_results = list(all_results.values())
-            final_results.sort(key=lambda x: x.similarity_score, reverse=True)
-
-            return final_results[: self.max_results]
-
-        except Exception as e:
-            logger.error(f"❌ 하이브리드 검색 실패: {e}")
-            return []
-
-    def _search_by_text_similarity(self, query_text: str) -> list[CodeSearchResult]:
-        """텍스트 유사도 기반 검색 (키워드 매칭)
-
-        Args:
-            query_text: 검색할 텍스트
-
-        Returns:
-            텍스트 매칭 결과
-        """
-        # MVP에서는 간단한 키워드 매칭만 구현
-        # 추후 Neo4j의 full-text search 기능 활용 가능
-        try:
-            keywords = query_text.lower().split()
-            if not keywords:
-                return []
-
-            # 각 키워드로 노드 이름이나 소스 코드에서 매칭되는 노드 찾기
-            # 실제로는 Neo4j의 텍스트 검색 기능을 사용하는 것이 좋지만
-            # MVP에서는 간단히 구현
-            return []  # 현재 버전에서는 벡터 검색에만 집중
-
-        except Exception as e:
-            logger.error(f"❌ 텍스트 검색 실패: {e}")
-            return []

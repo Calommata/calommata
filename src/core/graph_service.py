@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from src.parser import CodeAnalyzer
+from src.parser import CodeASTAnalyzer
 from src.graph import ParserToGraphAdapter
 from src.graph import Neo4jPersistence
 from src.graph import CodeGraph
@@ -19,7 +19,7 @@ from .embedder import CodeEmbedder
 logger = logging.getLogger(__name__)
 
 
-class GraphService(BaseModel):
+class CodeGraphService(BaseModel):
     """코드 그래프 분석 및 관리 서비스
 
     Parser로 코드 분석 -> Graph 변환 -> 임베딩 생성 -> Neo4j 저장
@@ -50,7 +50,7 @@ class GraphService(BaseModel):
         logger.info(f"프로젝트 분석 시작: {project_path}")
 
         # 1. Parser로 코드 분석
-        analyzer = CodeAnalyzer()
+        analyzer = CodeASTAnalyzer()
         code_blocks = analyzer.analyze_directory(project_path)
         logger.info(f"✅ {len(code_blocks)}개 코드 블록 추출 완료")
 
@@ -98,7 +98,7 @@ class GraphService(BaseModel):
         logger.info(f"파일 분석 시작: {file_path}")
 
         # 1. Parser로 코드 분석
-        analyzer = CodeAnalyzer()
+        analyzer = CodeASTAnalyzer()
         code_blocks = analyzer.analyze_file(file_path)
         logger.info(f"✅ {len(code_blocks)}개 코드 블록 추출 완료")
 
@@ -136,13 +136,10 @@ class GraphService(BaseModel):
         for i in range(0, len(nodes), batch_size):
             batch = nodes[i : i + batch_size]
 
-            # 코드 + docstring 결합하여 임베딩
+            # 코드 임베딩
             texts = []
             for node in batch:
-                text = node.source_code
-                if node.docstring:
-                    text = f"{node.docstring}\n\n{node.source_code}"
-                texts.append(text)
+                texts.append(node.source_code)
 
             # 임베딩 생성
             try:
@@ -190,13 +187,7 @@ class GraphService(BaseModel):
 
                 # 임베딩 생성
                 code = center_node.get("source_code", "")
-                docstring = center_node.get("docstring", "")
-
-                text = code
-                if docstring:
-                    text = f"{docstring}\n\n{code}"
-
-                embedding = self.embedder.embed_code(text)
+                embedding = self.embedder.embed_code(code)
 
                 # Neo4j 업데이트
                 self.persistence.update_node_embedding(

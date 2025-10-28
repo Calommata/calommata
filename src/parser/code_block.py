@@ -74,7 +74,6 @@ class CodeBlock:
         scope_level: 스코프 깊이 (0: 모듈, 1: 클래스, 2: 함수 등)
         complexity: 복잡도 점수
         typed_dependencies: 타입별로 분류된 의존성들
-        docstring: 블록의 문서화 문자열
     """
 
     block_type: str
@@ -90,7 +89,6 @@ class CodeBlock:
     scope_level: int = 0
     complexity: int = 0
     typed_dependencies: list[Dependency] | None = None
-    docstring: str | None = None
 
     def __post_init__(self) -> None:
         """데이터 클래스 초기화 후 처리"""
@@ -256,6 +254,5 @@ class CodeBlock:
                 }
                 for dep in (self.typed_dependencies or [])
             ],
-            "docstring": self.docstring or "",
             "source_code": self.source_code or "",
         }

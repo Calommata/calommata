@@ -44,17 +44,16 @@ class ASTExtractor:
     ) -> list[CodeBlock]:
         """TSQuery를 사용하여 AST 트리에서 모든 블록 추출"""
         blocks: list[CodeBlock] = []
-        source_lines = source_code.split("\n")
 
         # 1. 모듈 블록 생성 (최상위)
         module_block = self._create_module_block(source_code, file_path)
         blocks.append(module_block)
 
         # 2. TSQuery를 사용하여 각 블록 타입별 추출
-        self._extract_blocks_by_query(tree, blocks, source_lines, file_path)
+        self._extract_blocks_by_query(tree, blocks, file_path)
 
         # 3. 의존성 관계 분석
-        self._analyze_dependencies(tree, blocks, source_lines)
+        self._analyze_dependencies(tree, blocks)
 
         return blocks
 
@@ -62,7 +61,6 @@ class ASTExtractor:
         self,
         tree: Tree,
         blocks: list[CodeBlock],
-        source_lines: list[str],
         file_path: str,
     ) -> None:
         """TSQuery를 사용하여 블록들을 추출"""
@@ -80,7 +78,7 @@ class ASTExtractor:
             for pattern_index, captures in matches:
                 # 각 쿼리별 블록 생성
                 block = self._create_block_from_captures(
-                    query_name, captures, blocks, source_lines, file_path
+                    query_name, captures, blocks, file_path
                 )
                 if block:
                     blocks.append(block)
@@ -90,7 +88,6 @@ class ASTExtractor:
         query_name: str,
         captures: dict[str, list[Node]],
         blocks: list[CodeBlock],
-        source_lines: list[str],
         file_path: str,
     ) -> CodeBlock | None:
         """TSQuery 캡처 결과로부터 CodeBlock 생성"""
@@ -220,12 +217,6 @@ class ASTExtractor:
                 if superclass:
                     dependencies.append(f"inherits:{superclass}")
 
-        # docstring 추출
-        docstring = None
-        if "class.docstring" in captures and captures["class.docstring"]:
-            docstring_text = self._get_node_text(captures["class.docstring"][0])
-            docstring = self._clean_docstring(docstring_text)
-
         return CodeBlock(
             block_type="class",
             name=class_name,
@@ -235,7 +226,6 @@ class ASTExtractor:
             parent=parent,
             source_code=source_code,
             dependencies=dependencies,
-            docstring=docstring,
         )
 
     def _create_function_block_from_captures(
@@ -265,12 +255,6 @@ class ASTExtractor:
 
         parent = self._find_parent_block(start_line, blocks)
 
-        # docstring 추출
-        docstring = None
-        if "function.docstring" in captures and captures["function.docstring"]:
-            docstring_text = self._get_node_text(captures["function.docstring"][0])
-            docstring = self._clean_docstring(docstring_text)
-
         return CodeBlock(
             block_type="function",
             name=func_name,
@@ -279,31 +263,9 @@ class ASTExtractor:
             file_path=file_path,
             parent=parent,
             source_code=source_code,
-            docstring=docstring,
         )
 
-    def _clean_docstring(self, docstring_text: str) -> str:
-        """docstring 텍스트 정리"""
-        if not docstring_text:
-            return ""
-
-        # 따옴표 제거 (""", ''', ", ')
-        cleaned = docstring_text.strip()
-        if cleaned.startswith('"""') and cleaned.endswith('"""'):
-            cleaned = cleaned[3:-3]
-        elif cleaned.startswith("'''") and cleaned.endswith("'''"):
-            cleaned = cleaned[3:-3]
-        elif cleaned.startswith('"') and cleaned.endswith('"'):
-            cleaned = cleaned[1:-1]
-        elif cleaned.startswith("'") and cleaned.endswith("'"):
-            cleaned = cleaned[1:-1]
-
-        # 앞뒤 공백 제거 및 개행 정리
-        return cleaned.strip()
-
-    def _analyze_dependencies(
-        self, tree: Tree, blocks: list[CodeBlock], source_lines: list[str]
-    ) -> None:
+    def _analyze_dependencies(self, tree: Tree, blocks: list[CodeBlock]) -> None:
         """TSQuery를 사용하여 의존성 관계 분석"""
         # 함수 호출 관계 분석
         if "function_calls" in self.queries:

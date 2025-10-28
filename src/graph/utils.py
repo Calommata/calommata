@@ -191,7 +191,6 @@ class GraphExporter:
                     "start_line": node.start_line,
                     "end_line": node.end_line,
                     "source_code": node.source_code,
-                    "docstring": node.docstring,
                     "complexity": node.complexity,
                     "scope_level": node.scope_level,
                     "parameters": node.parameters,

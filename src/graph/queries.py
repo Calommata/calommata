@@ -76,7 +76,6 @@ class Neo4jQueries:
             n.start_line = node_data.start_line,
             n.end_line = node_data.end_line,
             n.source_code = node_data.source_code,
-            n.docstring = node_data.docstring,
             n.complexity = node_data.complexity,
             n.scope_level = node_data.scope_level,
             n.embedding = node_data.embedding,
@@ -126,7 +125,6 @@ class Neo4jQueries:
                node.type AS type,
                node.file_path AS file_path,
                node.source_code AS source_code,
-               node.docstring AS docstring,
                score
         ORDER BY score DESC
     """

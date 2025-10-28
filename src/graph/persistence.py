@@ -3,13 +3,6 @@ Neo4j 데이터베이스 지속성 계층
 
 코드 그래프의 저장, 조회, 벡터 인덱스 관리를 담당합니다.
 Graph 패키지의 모델 데이터를 Neo4j에 저장하고 검색하는 기능을 제공합니다.
-
-리팩토링된 버전:
-- 쿼리 분리 (queries.py)
-- 예외 처리 개선 (exceptions.py)
-- 배치 처리 최적화
-- 타입 힌팅 강화
-- 로깅 개선
 """
 
 import logging
@@ -60,7 +53,7 @@ class Neo4jPersistence:
         """
         self.uri = uri or os.getenv("NEO4J_URI", "bolt://localhost:7687")
         self.user = user or os.getenv("NEO4J_USER", "neo4j")
-        self.password = password or os.getenv("NEO4J_PASSWORD", "password")
+        self.password = password or os.getenv("NEO4J_PASSWORD", "neo4j")
         self.batch_size = batch_size
 
         self._driver: Driver | None = None
@@ -160,7 +153,7 @@ class Neo4jPersistence:
                 for index in self._queries.INDEXES:
                     self._execute_schema_query(session, index, "인덱스")
 
-                # 벡터 인덱스 생성 (기본적으로 768차원 사용)
+                # 벡터 인덱스 생성
                 self._execute_schema_query(
                     session, self._queries.VECTOR_INDEX, "벡터 인덱스"
                 )
@@ -186,7 +179,6 @@ class Neo4jPersistence:
                 # 기존 벡터 인덱스 삭제
                 try:
                     session.run("DROP INDEX code_embedding_index IF EXISTS")
-                    session.run("DROP INDEX code_embedding_index_hf IF EXISTS")
                 except Exception:
                     pass  # 인덱스가 없으면 무시
 
@@ -647,12 +639,6 @@ class Neo4jPersistence:
             raise
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """컨텍스트 매니저 종료
-
-        Args:
-            exc_type: 예외 타입
-            exc_val: 예외 값
-            exc_tb: 예외 트레이스백
-        """
+    def __exit__(self) -> None:
+        """컨텍스트 매니저 종료"""
         self.close()
