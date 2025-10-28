@@ -48,8 +48,8 @@ class CodeRAGAgent(BaseModel):
     embedder: CodeEmbedder = Field(..., description="코드 임베딩 생성기")
     retriever: CodeRetriever = Field(..., description="코드 검색 리트리버")
     llm_api_key: str = Field(..., description="Google Gemini API 키")
-    model_name: str = Field(default="gemini-2.5-flash", description="사용할 LLM 모델")
-    temperature: float = Field(default=0.1, description="LLM 온도")
+    model_name: str = Field(default="gemini-2.0-flash", description="사용할 LLM 모델")
+    temperature: float = Field(default=0.7, description="LLM 온도")
     max_tokens: int = Field(default=4096, description="최대 토큰 수")
 
     _llm: Any = None
@@ -139,7 +139,6 @@ class CodeRAGAgent(BaseModel):
                 query_embedding=query_embedding,
                 limit=5,
             )
-
             logger.info(f"✅ {len(search_results)}개 코드 검색 완료")
             return {"search_results": search_results}
 
@@ -165,7 +164,6 @@ class CodeRAGAgent(BaseModel):
             context_parts.append(result.to_context_string())
 
         context = "\n".join(context_parts)
-
         logger.info(f"✅ 컨텍스트 구성 완료 (길이: {len(context)})")
         return {"context": context}
 
@@ -192,7 +190,8 @@ class CodeRAGAgent(BaseModel):
         prompt = ChatPromptTemplate.from_messages(
             [
                 SystemMessage(system_prompt),
-                HumanMessage(
+                (
+                    "human",
                     """**사용자 질문:**
 {query}
 

@@ -16,7 +16,7 @@ class ASTExtractor:
     코드 블록을 추출합니다. 언어별 쿼리를 통해 다양한 언어를 지원합니다.
     """
 
-    def __init__(self, language: Language, queries: dict[str, str]) -> None:
+    def __init__(self, language: Language, queries: dict[str, str]):
         """초기화
 
         Args:
@@ -64,7 +64,6 @@ class ASTExtractor:
         file_path: str,
     ) -> None:
         """TSQuery를 사용하여 블록들을 추출"""
-        # 순서대로 처리: 클래스 먼저, 그 다음 함수들
         extraction_order = ["classes", "functions", "imports"]
 
         for query_name in extraction_order:

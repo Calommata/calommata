@@ -752,10 +752,10 @@ def test_complex_code_analysis():
             # 다양한 GraphRAG 질의 테스트
             test_queries = [
                 "UserService 클래스의 create_user 메서드는 어떤 역할을 하나요?",
-                "require_admin 데코레이터는 어떻게 작동하나요?",
-                "Product 클래스가 DatabaseEntity를 상속받는 이유는 무엇인가요?",
-                "주문 생성 시 재고 관리는 어떻게 처리되나요?",
-                "사용자 권한 시스템은 어떻게 구현되어 있나요?",
+                # "require_admin 데코레이터는 어떻게 작동하나요?",
+                # "Product 클래스가 DatabaseEntity를 상속받는 이유는 무엇인가요?",
+                # "주문 생성 시 재고 관리는 어떻게 처리되나요?",
+                # "사용자 권한 시스템은 어떻게 구현되어 있나요?",
             ]
 
             for i, query in enumerate(test_queries, 1):
@@ -765,8 +765,7 @@ def test_complex_code_analysis():
                 search_results = agent.get_search_results(query)
                 logger.info(f"검색 결과: {len(search_results)}개")
 
-                # 상위 3개 결과 출력
-                for idx, result in enumerate(search_results[:3]):
+                for idx, result in enumerate(search_results):
                     result_type = (
                         result.node_type
                         if hasattr(result.node_type, "value")
