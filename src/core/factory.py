@@ -1,5 +1,3 @@
-"""간편한 초기화를 위한 팩토리 함수들"""
-
 import logging
 
 from src.graph import Neo4jPersistence

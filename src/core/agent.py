@@ -1,8 +1,3 @@
-"""AI Agent 모듈
-
-LangChain과 LangGraph를 사용하여 코드 검색 및 분석을 수행하는 AI Agent
-"""
-
 import logging
 from typing import Any
 

@@ -1,9 +1,4 @@
-"""AI Agent State 정의
-
-LangGraph Agent의 상태를 정의합니다.
-"""
-
-from typing import Annotated, Sequence
+from typing import Annotated
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
@@ -13,7 +8,7 @@ from src.core.code_retriever import CodeSearchResult
 
 
 class AgentState(BaseModel):
-    messages: Annotated[Sequence[BaseMessage], add_messages] = Field(
+    messages: Annotated[list[BaseMessage], add_messages] = Field(
         default_factory=list, description="대화 메시지 리스트"
     )
 

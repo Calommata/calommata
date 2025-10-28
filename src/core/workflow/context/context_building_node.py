@@ -1,8 +1,3 @@
-"""컨텍스트 구성 노드 모듈
-
-검색된 코드들을 LLM이 이해하기 쉬운 형태로 구성합니다.
-"""
-
 import logging
 from typing import Any
 
@@ -13,8 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def context_building_node(state: AgentState) -> dict[str, Any]:
-    """컨텍스트 구성
-
+    """
     검색된 코드들을 LLM이 이해하기 쉬운 형태로 구성합니다.
 
     Args:

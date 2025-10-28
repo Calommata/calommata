@@ -8,16 +8,13 @@ logger = logging.getLogger(__name__)
 
 
 class ContextOptimizer:
-    """LLM 컨텍스트 최적화 클래스"""
-
     def __init__(
         self,
         max_code_length: int = 500,
         max_total_context: int = 4000,
         related_nodes_limit: int = DEFAULT_RELATED_NODES_LIMIT,
     ):
-        """초기화
-
+        """
         Args:
             max_code_length: 단일 코드 스니펫 최대 길이
             max_total_context: 전체 컨텍스트 최대 길이
