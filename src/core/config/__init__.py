@@ -1,7 +1,6 @@
 import os
+from dataclasses import dataclass, field
 from typing import Any
-
-from pydantic import BaseModel, Field
 
 from src.core.config.neo4j import Neo4jConfig
 from src.core.config.embedding import EmbeddingConfig
@@ -9,24 +8,21 @@ from src.core.config.retriever import RetrieverConfig
 from src.core.config.llm import LLMConfig
 
 
-class CoreConfig(BaseModel):
-    """Core 패키지 전체 설정"""
-
-    neo4j: Neo4jConfig = Field(default_factory=Neo4jConfig)
-    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
-    retriever: RetrieverConfig = Field(default_factory=RetrieverConfig)
-    llm: LLMConfig = Field(default_factory=LLMConfig)
-
-    project_name: str = Field(
-        default_factory=lambda: os.getenv("PROJECT_NAME", "code-analyzer"),
-        description="프로젝트 이름",
+@dataclass
+class CoreConfig:
+    neo4j: Neo4jConfig = field(default_factory=lambda: Neo4jConfig())
+    embedding: EmbeddingConfig = field(default_factory=lambda: EmbeddingConfig())
+    retriever: RetrieverConfig = field(default_factory=lambda: RetrieverConfig())
+    llm: LLMConfig = field(default_factory=lambda: LLMConfig())
+    project_name: str = field(
+        default_factory=lambda: os.getenv("PROJECT_NAME", "example-project")
     )
 
-    @classmethod
-    def from_env(cls) -> "CoreConfig":
+    @staticmethod
+    def from_env() -> "CoreConfig":
         """환경 변수에서 설정 로드"""
-        return cls()
+        return CoreConfig()
 
     def to_dict(self) -> dict[str, Any]:
         """딕셔너리로 변환"""
-        return self.model_dump()
+        return self.__dict__

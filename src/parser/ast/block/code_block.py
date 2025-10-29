@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -40,22 +40,14 @@ class CodeBlock:
     name: str
     file_path: str = ""
     parent: CodeBlock | None = None
-    children: list[CodeBlock] | None = None
-    imports: list[str] | None = None
+    children: list[CodeBlock] = field(default_factory=list)
+    imports: list[str] = field(default_factory=list)
     source_code: str | None = None
-    dependencies: list[str] | None = None
+    dependencies: list[str] = field(default_factory=list)
     scope_level: int = 0
     complexity: int = 0
 
     def __post_init__(self) -> None:
-        """데이터 클래스 초기화 후 처리"""
-        if self.children is None:
-            self.children = []
-        if self.imports is None:
-            self.imports = []
-        if self.dependencies is None:
-            self.dependencies = []
-
         # 복잡도 및 스코프 레벨 계산
         self.complexity = self._calculate_complexity()
         self.scope_level = self._calculate_scope_level()

@@ -9,12 +9,11 @@ from typing import Any, Literal
 
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain_huggingface import HuggingFaceEmbeddings
-from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
 
-class CodeEmbedder(BaseModel):
+class CodeEmbedder:
     """코드 임베딩 생성기
 
     로컬 LLM (Ollama) 또는 Hugging Face 모델을 사용하여
@@ -32,58 +31,32 @@ class CodeEmbedder(BaseModel):
     - BAAI/bge-small-en-v1.5
     """
 
-    provider: Literal["ollama", "huggingface"] = Field(
-        default="ollama", description="임베딩 제공자 (ollama 또는 huggingface)"
-    )
+    def __init__(
+        self,
+        provider: Literal["ollama", "huggingface"],
+        model_name: str,
+        ollama_base_url: str,
+        model_kwargs: dict[str, Any],
+        encode_kwargs: dict[str, Any],
+    ) -> None:
+        self.model_name = model_name
+        self.provider = provider
+        self.ollama_base_url = ollama_base_url
+        self.model_kwargs = model_kwargs
+        self.encode_kwargs = encode_kwargs
 
-    model_name: str = Field(
-        default="nomic-embed-text",
-        description="사용할 임베딩 모델 이름",
-    )
-
-    # Ollama 설정
-    ollama_base_url: str = Field(
-        default="http://localhost:11434", description="Ollama 서버 URL"
-    )
-
-    # HuggingFace 설정
-    model_kwargs: dict[str, Any] = Field(
-        default_factory=lambda: {"device": "cpu"},
-        description="HuggingFace 모델 초기화 파라미터",
-    )
-
-    encode_kwargs: dict[str, Any] = Field(
-        default_factory=lambda: {"normalize_embeddings": True},
-        description="HuggingFace 인코딩 파라미터",
-    )
-
-    _embeddings: HuggingFaceEmbeddings | OllamaEmbeddings | None = None
-
-    class Config:
-        arbitrary_types_allowed = True
-
-    def __init__(self, **data: Any):
-        """임베딩 모델 초기화
-
-        Args:
-            **data: 모델 설정 파라미터
-        """
-        super().__init__(**data)
-        self._initialize_model()
-
-    def _initialize_model(self) -> None:
-        """임베딩 모델 초기화"""
+        # 임베딩 모델 초기화
         try:
             logger.info(f"임베딩 모델 로딩 중: {self.provider}/{self.model_name}")
 
-            if self.provider == "ollama":
+            if provider == "ollama":
                 self._embeddings = OllamaEmbeddings(
                     model=self.model_name,
                     base_url=self.ollama_base_url,
                 )
                 logger.info(f"✅ Ollama 임베딩 모델 로딩 완료: {self.model_name}")
 
-            elif self.provider == "huggingface":
+            elif provider == "huggingface":
                 self._embeddings = HuggingFaceEmbeddings(
                     model_name=self.model_name,
                     model_kwargs=self.model_kwargs,
@@ -92,7 +65,7 @@ class CodeEmbedder(BaseModel):
                 logger.info(f"✅ HuggingFace 임베딩 모델 로딩 완료: {self.model_name}")
 
             else:
-                raise ValueError(f"지원하지 않는 제공자: {self.provider}")
+                raise ValueError(f"지원하지 않는 제공자: {provider}")
 
         except Exception as e:
             logger.error(f"❌ 임베딩 모델 로딩 실패: {e}")
@@ -176,7 +149,7 @@ class CodeEmbedder(BaseModel):
         lines = code.split("\n")
 
         # 빈 줄이 연속으로 3개 이상이면 2개로 줄임
-        processed_lines = []
+        processed_lines: list[str] = []
         empty_count = 0
 
         for line in lines:
