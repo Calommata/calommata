@@ -6,7 +6,6 @@ Parser와 Graph Adapter를 사용하여 프로젝트 또는 단일 파일을 분
 import logging
 from pathlib import Path
 
-from pydantic import BaseModel, Field
 
 from src.parser import CodeASTAnalyzer
 from src.graph import ParserToGraphAdapter, CodeGraph
@@ -14,13 +13,9 @@ from src.graph import ParserToGraphAdapter, CodeGraph
 logger = logging.getLogger(__name__)
 
 
-class ProjectAnalyzer(BaseModel):
-    """프로젝트 및 파일 분석"""
-
-    project_name: str = Field(..., description="프로젝트 이름")
-
-    class Config:
-        arbitrary_types_allowed = True
+class ProjectAnalyzer:
+    def __init__(self, project_name: str) -> None:
+        self.project_name = project_name
 
     def analyze_and_store_project(self, project_path: str) -> CodeGraph:
         """프로젝트 분석 및 그래프 생성

@@ -52,23 +52,32 @@ class CodeSearchResult(BaseModel):
         return context
 
 
-class CodeRetriever(BaseModel):
+class CodeRetriever:
     """Neo4j에서 코드를 검색하는 리트리버
 
     벡터 유사도 검색과 그래프 탐색을 결합하여
     관련 코드를 효과적으로 찾아냅니다.
     """
 
-    persistence: Neo4jPersistence = Field(..., description="Neo4j 지속성 객체")
+    persistence: Neo4jPersistence
 
-    similarity_threshold: float = Field(default=0.7, description="유사도 임계값 (0-1)")
+    similarity_threshold: float = 0.7
 
-    max_results: int = Field(default=10, description="최대 검색 결과 수")
+    max_results: int = 10
 
-    context_depth: int = Field(default=2, description="그래프 탐색 깊이")
+    context_depth: int = 2
 
-    class Config:
-        arbitrary_types_allowed = True
+    def __init__(
+        self,
+        persistence: Neo4jPersistence | None,
+        similarity_threshold: float | None,
+        max_results: int | None,
+        context_depth: int | None,
+    ) -> None:
+        self.persistence = persistence or Neo4jPersistence()
+        self.similarity_threshold = similarity_threshold or 0.7
+        self.max_results = max_results or 10
+        self.context_depth = context_depth or 2
 
     def search_similar_code(
         self,

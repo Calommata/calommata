@@ -6,12 +6,11 @@ Pydantic v2 기반 데이터 검증 및 직렬화
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import logging
 from datetime import datetime
 from enum import Enum
 from typing import Any
-
-from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
@@ -45,59 +44,64 @@ class RelationType(Enum):
     RETURNS = "RETURNS"
 
 
-class Dependency(BaseModel):
+@dataclass
+class Dependency:
     """의존성 정보 모델"""
 
-    target: str = Field(..., description="의존 대상")
-    dependency_type: str = Field(
-        ..., description="의존성 타입 (import, call, inherit 등)"
-    )
-    context: str | None = Field(default=None, description="의존성 컨텍스트")
+    # 의존 대상
+    target: str
+    # 의존성 타입
+    dependency_type: str
+    # 의존성 컨텍스트
+    context: str | None = None
 
     def __str__(self) -> str:
         return f"{self.dependency_type}: {self.target}"
 
 
-class CodeNode(BaseModel):
+@dataclass
+class CodeNode:
     """코드 노드 모델 - Neo4j 노드로 변환될 기본 단위"""
 
     # 기본 식별자
-    id: str = Field(..., description="고유 식별자")
-    name: str = Field(..., description="노드 이름")
-    node_type: NodeType = Field(..., description="노드 타입")
+    id: str
 
-    # 위치 정보
-    file_path: str = Field(..., description="파일 경로")
+    # 노드 이름
+    name: str
 
-    # 코드 내용
-    source_code: str = Field(default="", description="소스 코드")
+    # 노드 타입
+    node_type: NodeType
 
-    # 메타데이터
-    complexity: int = Field(default=0, description="복잡도 점수")
-    scope_level: int = Field(default=0, description="스코프 깊이")
-    parameters: list[str] = Field(
-        default_factory=list, description="함수/메서드 매개변수"
-    )
-    return_type: str | None = Field(default=None, description="반환 타입")
-    decorators: list[str] = Field(default_factory=list, description="데코레이터 목록")
+    # 파일 경로
+    file_path: str
 
-    # 의존성 정보
-    dependencies: list[Dependency] = Field(
-        default_factory=list, description="의존성 목록"
-    )
-    imports: list[str] = Field(default_factory=list, description="import 목록")
+    # 소스 코드
+    source_code: str
 
-    # 임베딩 관련
-    embedding_vector: list[float] | None = Field(
-        default=None, description="코드 임베딩 벡터"
-    )
-    embedding_model: str | None = Field(default=None, description="사용된 임베딩 모델")
+    # 복잡도 점수
+    complexity: int = 0
+    # 스코프 깊이
+    scope_level: int = 0
+    # 함수/메서드 매개변수
+    parameters: list[str] = field(default_factory=list)
+    # 반환 타입
+    return_type: str | None = None
+    # 데코레이터 목록
+    decorators: list[str] = field(default_factory=list)
+
+    # 의존성 목록
+    dependencies: list[Dependency] = field(default_factory=list)
+    # Import 목록
+    imports: list[str] = field(default_factory=list)
+
+    # 코드 임베딩 벡터
+    embedding_vector: list[float] = field(default_factory=list)
+    # 사용된 임베딩 모델
+    embedding_model: str | None = None
 
     # 타임스탬프
-    created_at: datetime = Field(default_factory=datetime.now, description="생성 시간")
-    updated_at: datetime = Field(default_factory=datetime.now, description="수정 시간")
-
-    model_config = ConfigDict(use_enum_values=True)
+    created_at: datetime = datetime.now()
+    updated_at: datetime = datetime.now()
 
     def get_full_name(self) -> str:
         """노드의 전체 이름 반환 (file_path:type:name)
@@ -168,22 +172,24 @@ class CodeNode(BaseModel):
         }
 
 
-class CodeRelation(BaseModel):
+@dataclass
+class CodeRelation:
     """코드 관계 모델 - Neo4j 관계로 변환될 기본 단위"""
 
-    # 관계 식별자
-    from_node_id: str = Field(..., description="시작 노드 ID")
-    to_node_id: str = Field(..., description="끝 노드 ID")
-    relation_type: RelationType = Field(..., description="관계 타입")
+    # 시작 노드 ID
+    from_node_id: str
+    # 끝 노드 ID
+    to_node_id: str
+    # 관계 타입
+    relation_type: RelationType
 
-    # 관계 메타데이터
-    weight: float = Field(default=1.0, description="관계 가중치")
-    context: str | None = Field(default=None, description="관계 컨텍스트")
+    # 관계 가중치
+    weight: float = 1.0
+    # 관계 컨텍스트
+    context: str | None = None
 
-    # 타임스탬프
-    created_at: datetime = Field(default_factory=datetime.now, description="생성 시간")
-
-    model_config = ConfigDict(use_enum_values=True)
+    # 생성 시간
+    created_at: datetime = datetime.now()
 
     def to_neo4j_relation(self) -> dict[str, Any]:
         """Neo4j 관계 생성을 위한 딕셔너리 변환"""
@@ -201,25 +207,30 @@ class CodeRelation(BaseModel):
         }
 
 
-class CodeGraph(BaseModel):
+@dataclass
+class CodeGraph:
     """코드 그래프 모델 - 전체 프로젝트의 그래프 구조"""
 
-    # 기본 정보
-    project_name: str = Field(..., description="프로젝트 이름")
-    project_path: str = Field(..., description="프로젝트 경로")
+    # 프로젝트 이름
+    project_name: str
 
-    # 그래프 데이터
-    nodes: dict[str, CodeNode] = Field(default_factory=dict, description="노드들")
-    relations: list[CodeRelation] = Field(default_factory=list, description="관계들")
+    # 프로젝트 경로
+    project_path: str
 
-    # 메타데이터
-    total_files: int = Field(default=0, description="총 파일 수")
-    total_lines: int = Field(default=0, description="총 라인 수")
-    analysis_version: str = Field(default="1.0.0", description="분석 버전")
+    # 그래프 노드
+    nodes: dict[str, CodeNode] = field(default_factory=dict)
+    # 그래프 관계
+    relations: list[CodeRelation] = field(default_factory=list)
 
-    # 타임스탬프
-    created_at: datetime = Field(default_factory=datetime.now, description="생성 시간")
-    updated_at: datetime = Field(default_factory=datetime.now, description="수정 시간")
+    # 총 파일 수
+    total_files: int = 0
+    # 총 라인 수
+    total_lines: int = 0
+    # 분석 버전
+    analysis_version: str = "1.0.0"
+
+    created_at: datetime = datetime.now()
+    updated_at: datetime = datetime.now()
 
     @property
     def total_nodes(self) -> int:

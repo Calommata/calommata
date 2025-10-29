@@ -6,21 +6,17 @@
 import logging
 from typing import Any
 
-from pydantic import BaseModel, Field
-
 from src.graph import Neo4jPersistence
 
 logger = logging.getLogger(__name__)
 
 
-class GraphStatistics(BaseModel):
+class GraphStatistics:
     """그래프 통계 조회 및 프로젝트 관리"""
 
-    persistence: Neo4jPersistence = Field(..., description="Neo4j 지속성 객체")
-    project_name: str = Field(..., description="프로젝트 이름")
-
-    class Config:
-        arbitrary_types_allowed = True
+    def __init__(self, persistence: Neo4jPersistence, project_name: str):
+        self.persistence = persistence
+        self.project_name = project_name
 
     def get_statistics(self) -> dict[str, Any]:
         """프로젝트 통계 정보 조회

@@ -5,7 +5,6 @@
 
 import logging
 
-from pydantic import BaseModel, Field
 
 from src.graph import CodeGraph, Neo4jPersistence
 
@@ -15,14 +14,12 @@ from src.core.constants.embedding import DEFAULT_EMBEDDING_BATCH_SIZE
 logger = logging.getLogger(__name__)
 
 
-class GraphEmbedder(BaseModel):
+class GraphEmbedder:
     """그래프 노드 임베딩 생성 및 관리"""
 
-    embedder: CodeEmbedder = Field(..., description="코드 임베딩 생성기")
-    persistence: Neo4jPersistence = Field(..., description="Neo4j 지속성 객체")
-
-    class Config:
-        arbitrary_types_allowed = True
+    def __init__(self, embedder: CodeEmbedder, persistence: Neo4jPersistence):
+        self.embedder = embedder
+        self.persistence = persistence
 
     def create_embeddings_for_graph(self, graph: CodeGraph) -> None:
         """그래프의 모든 노드에 대해 임베딩 생성
